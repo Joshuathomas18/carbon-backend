@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kisan Carbon - Map Confirmation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;800&amp;family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#404940",
+                    "surface-container": "#edeeef",
+                    "tertiary": "#004a36",
+                    "on-tertiary-container": "#93debe",
+                    "surface-variant": "#e1e3e4",
+                    "inverse-surface": "#2e3132",
+                    "on-background": "#191c1d",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-fixed": "#002116",
+                    "background": "#f8f9fa",
+                    "outline": "#707a6f",
+                    "surface-dim": "#d9dadb",
+                    "on-secondary": "#ffffff",
+                    "tertiary-fixed": "#a6f2d1",
+                    "on-tertiary": "#ffffff",
+                    "on-surface": "#191c1d",
+                    "tertiary-fixed-dim": "#8bd6b6",
+                    "on-secondary-container": "#682c00",
+                    "on-tertiary-fixed-variant": "#00513b",
+                    "surface-tint": "#006d30",
+                    "on-secondary-fixed": "#331200",
+                    "inverse-on-surface": "#f0f1f2",
+                    "secondary-fixed": "#ffdbca",
+                    "primary": "#004c1f",
+                    "on-primary-fixed": "#00210a",
+                    "error-container": "#ffdad6",
+                    "surface-container-highest": "#e1e3e4",
+                    "on-primary-container": "#81e394",
+                    "secondary-container": "#fd8a42",
+                    "surface-container-low": "#f3f4f5",
+                    "surface-bright": "#f8f9fa",
+                    "tertiary-container": "#11644b",
+                    "surface": "#f8f9fa",
+                    "on-error": "#ffffff",
+                    "on-primary-fixed-variant": "#005323",
+                    "secondary-fixed-dim": "#ffb68e",
+                    "secondary": "#9b4500",
+                    "surface-container-high": "#e7e8e9",
+                    "primary-fixed-dim": "#79db8d",
+                    "primary-fixed": "#95f8a7",
+                    "on-secondary-fixed-variant": "#763300",
+                    "on-primary": "#ffffff",
+                    "inverse-primary": "#79db8d",
+                    "error": "#ba1a1a",
+                    "primary-container": "#00662d",
+                    "outline-variant": "#bfc9bd",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {},
+            "fontFamily": {
+                    "headline": ["Lexend"],
+                    "body": ["Be Vietnam Pro"],
+                    "label": ["Be Vietnam Pro"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'Be Vietnam Pro', sans-serif; }
+        h1, h2, h3 { font-family: 'Lexend', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface max-w-[480px] mx-auto min-h-screen relative overflow-hidden flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full flex justify-between items-center px-6 py-4 h-20 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md z-50 shadow-sm dark:shadow-none">
+<div class="flex items-center gap-3">
+<div class="p-2 rounded-full hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors">
+<span class="material-symbols-outlined text-emerald-900 dark:text-emerald-500" data-icon="language">language</span>
+</div>
+<span class="text-2xl font-bold tracking-tight text-emerald-900 dark:text-emerald-100">Kisan Carbon</span>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden">
+<img alt="Farmer Profile Avatar" class="w-full h-full object-cover" data-alt="portrait of a confident Indian smallholder farmer in traditional attire with a warm, professional expression" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIdhEzYcN-D5pUJHI8XVmwUiOqVJ-rWoU42R6B6cahi9_gozaubnRTgPvmWYhruyhdWmOZt0KwNZaipI-WRTCuHkuTB5sd-FiQH2fYTCeEAZ3jawQ5CEp6wZphcpPv3HVIGDwiPp14l9eXP010kM2xFntuTl0lhZ_Xost-B30H1gxukPpo7-oiFylmI_lURTZiaKra1h5CZpz0baoeosTLG-xFi4qukUsLkg5TL6ITiM9Ngn1UuKYLIO5M5IGNj34_jLTrlv99zqA"/>
+</div>
+</header>
+<!-- Map View Section -->
+<main class="flex-grow pt-20 flex flex-col">
+<section class="relative h-[530px] w-full overflow-hidden">
+<div class="absolute inset-0 bg-surface-container-highest">
+<img class="w-full h-full object-cover brightness-90" data-alt="high-resolution satellite view of vibrant green agricultural fields in rural India with a highlighted neon green polygon boundary" data-location="Mandya District" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYIdBi2aiEEEMY6ApfguVoWIcYKqAxAhfDEyHw0qUVU6tre4K1Db-JEG74uJmADmv1Ra-Tth3Hku2ggVW3mq8V1uIw2uHTvm5ljqWtJUfj7G6m8ru9U_urBYQlMNq7ejmzpbfmlqvMXn9TUMILjMbk1fQH-8iGnHH0o9s01OLmODS_u8sGu2MCxJaD9Czr4UPpzbO2bHY7dvQWqMmx650tRI8ME_1NThu0Eypjpy3EnN-umXzVfuAKMs7NZMgnP40GONWnbJi4uOE"/>
+<!-- SVG Overlay for Polygon Boundary -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" preserveaspectratio="none" viewbox="0 0 400 600">
+<path d="M120,200 L280,180 L310,350 L150,380 Z" fill="rgba(0, 76, 31, 0.2)" stroke="#004c1f" stroke-dasharray="8 4" stroke-width="3"></path>
+</svg>
+<!-- Map Controls Overlay -->
+<div class="absolute right-4 top-4 flex flex-col gap-3">
+<button class="w-12 h-12 rounded-xl bg-white/90 backdrop-blur-md shadow-lg flex items-center justify-center text-primary active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="layers">layers</span>
+</button>
+<button class="w-12 h-12 rounded-xl bg-white/90 backdrop-blur-md shadow-lg flex items-center justify-center text-primary active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="my_location">my_location</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Information & Action Card -->
+<section class="relative z-10 -mt-12 flex-grow bg-surface rounded-t-[3rem] px-8 pt-10 pb-32 flex flex-col gap-8 shadow-[0_-12px_40px_rgba(0,0,0,0.08)]">
+<div class="w-12 h-1.5 bg-outline-variant/30 rounded-full mx-auto mb-2"></div>
+<header class="space-y-2">
+<h2 class="text-3xl font-bold text-on-surface tracking-tight">Is this your land?</h2>
+<p class="text-on-surface-variant font-medium">Verify the boundaries for your carbon voice claim.</p>
+</header>
+<div class="grid grid-cols-1 gap-4">
+<!-- Data Row: Location -->
+<div class="bg-surface-container-low p-5 rounded-2xl flex items-center gap-5">
+<div class="w-12 h-12 bg-surface-container-highest rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="location_on">location_on</span>
+</div>
+<div>
+<p class="text-xs font-bold uppercase tracking-widest text-outline">Location</p>
+<p class="text-lg font-bold text-on-surface">Mandya District, KA</p>
+</div>
+</div>
+<!-- Data Row: Size -->
+<div class="bg-surface-container-low p-5 rounded-2xl flex items-center gap-5">
+<div class="w-12 h-12 bg-surface-container-highest rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" data-icon="square_foot">square_foot</span>
+</div>
+<div>
+<p class="text-xs font-bold uppercase tracking-widest text-outline">Estimated Size</p>
+<p class="text-lg font-bold text-on-surface">4.8 Acres</p>
+</div>
+</div>
+</div>
+<!-- Action Buttons Container -->
+<div class="flex gap-4 items-center">
+<button class="flex-1 h-16 rounded-xl border-2 border-outline-variant text-on-surface font-bold text-lg hover:bg-surface-container-low transition-colors active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="edit_square">edit_square</span>
+                    No, adjust
+                </button>
+<button class="flex-[1.5] h-16 rounded-xl bg-primary text-on-primary font-bold text-lg shadow-lg shadow-primary/20 hover:bg-primary-container transition-colors active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                    Yes, confirm
+                </button>
+</div>
+</section>
+</main>
+<!-- BottomNavBar (Suppressed for focused task logic) -->
+<!-- Suppressed: Task is focused confirmation sub-page -->
+<!-- Voice Input Hub (FAB) - Suppression Logic applied as this is a focused Details/Confirmation screen -->
+<div class="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 hidden">
+<!-- Hidden as per FAB Suppression Logic for Confirmation screens -->
+</div>
+</body></html>

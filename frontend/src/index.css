@@ -1,0 +1,56 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;900&family=Be+Vietnam+Pro:wght@400;500;700;900&display=swap');
+
+:root {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light;
+  color: #1a1c1d;
+  background-color: #ffffff;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+h1, h2, h3, h4, .font-lexend {
+  font-family: 'Lexend', sans-serif;
+}
+
+#root {
+  width: 100%;
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+/* Mobile-only container styling - Premium Shadow */
+.mobile-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background-color: white;
+  box-shadow: 0 40px 100px -20px rgba(0, 50, 0, 0.15);
+  overflow-x: hidden;
+  position: relative;
+}
+
+@theme {
+  --color-earthy-green: #15803d;
+  --color-soil-amber: #fffbeb;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 0px;
+}

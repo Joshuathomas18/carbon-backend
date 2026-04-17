@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: carbon-db
+    environment:
+      POSTGRES_USER: carbon_user
+      POSTGRES_PASSWORD: carbon_password
+      POSTGRES_DB: carbon_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carbon_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: carbon-cache
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  fastapi:
+    build: .
+    container_name: carbon-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://carbon_user:carbon_password@postgres:5432/carbon_db
+      REDIS_URL: redis://redis:6379/0
+      GEE_PROJECT_ID: ${GEE_PROJECT_ID}
+      SARVAM_API_KEY: ${SARVAM_API_KEY}
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: carbon-network

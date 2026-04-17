@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: carbon-db-prod
+    environment:
+      POSTGRES_USER: ${DB_USER:-carbon_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_this_password}
+      POSTGRES_DB: carbon_db
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-carbon_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - carbon-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: carbon-cache-prod
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - carbon-network
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: carbon-api-prod
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-carbon_user}:${DB_PASSWORD:-change_this_password}@postgres:5432/carbon_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      GEE_PROJECT_ID: ${GEE_PROJECT_ID}
+      SARVAM_API_KEY: ${SARVAM_API_KEY}
+      ENVIRONMENT: production
+      DEBUG: false
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: gunicorn app.main:app --bind 0.0.0.0:8000 --workers 4 --worker-class uvicorn.workers.UvicornWorker
+    networks:
+      - carbon-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+
+networks:
+  carbon-network:
+    driver: bridge

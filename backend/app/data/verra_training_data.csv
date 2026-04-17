@@ -1,0 +1,26 @@
+project_id,project_name,state,region,crop_type,verified_tonnes_co2_per_hectare,years_since_baseline,soil_clay_percent,soil_organic_carbon,practice_burning,practice_residue,practice_cover_crop,confidence
+VCS001,Sustainable Rice Farming Punjab,Punjab,Punjab,rice,2.1,2,32,1.2,0,1,0,0.87
+VCS002,Wheat Improvement Haryana,Haryana,Haryana,wheat,1.7,2,28,0.95,0,0,1,0.84
+VCS003,Maize Innovation Karnataka,Karnataka,Karnataka,maize,1.5,1,35,1.1,0,1,0,0.82
+VCS004,Sugarcane Best Practices,Karnataka,Karnataka,sugarcane,2.5,3,38,1.4,0,1,1,0.89
+VCS005,Cotton Conservation,Maharashtra,Maharashtra,cotton,1.2,2,25,0.8,0,0,1,0.78
+VCS006,Wheat Conservation II,Madhya_Pradesh,Madhya_Pradesh,wheat,1.6,2,30,1.0,0,1,0,0.83
+VCS007,Zero Till Maize,Punjab,Punjab,maize,1.4,1,31,1.0,0,0,0,0.80
+VCS008,Rice Residue Management,Haryana,Haryana,rice,2.0,2,29,1.15,0,1,0,0.86
+VCS009,Chickpea Agroforestry,Madhya_Pradesh,Madhya_Pradesh,chickpea,0.9,1,27,0.85,0,0,1,0.76
+VCS010,Cotton Integrated Pest,Maharashtra,Maharashtra,cotton,1.3,2,26,0.85,0,1,0,0.79
+VCS011,Sugarcane Energy Crop,Karnataka,Karnataka,sugarcane,2.4,2,37,1.35,0,1,0,0.88
+VCS012,Rice Organic Transition,Punjab,Punjab,rice,2.2,3,33,1.25,0,1,1,0.85
+VCS013,Wheat Crop Rotation,Haryana,Haryana,wheat,1.8,2,27,1.05,0,1,1,0.85
+VCS014,Maize Direct Seeding,Karnataka,Karnataka,maize,1.6,2,34,1.15,0,0,1,0.81
+VCS015,Cotton Efficient Water,Maharashtra,Maharashtra,cotton,1.25,1,24,0.9,0,0,1,0.77
+VCS016,Chickpea Cover Crop,Karnataka,Karnataka,chickpea,1.1,1,32,0.95,0,0,1,0.80
+VCS017,Rice System Intensif,Punjab,Punjab,rice,2.3,3,34,1.3,0,1,1,0.88
+VCS018,Wheat Nutrient Mgmt,Madhya_Pradesh,Madhya_Pradesh,wheat,1.7,2,31,1.05,0,0,1,0.82
+VCS019,Maize Soil Conservation,Punjab,Punjab,maize,1.5,2,30,1.1,0,1,0,0.81
+VCS020,Sugarcane Sustainability,Maharashtra,Maharashtra,sugarcane,2.3,2,36,1.3,0,1,0,0.87
+VCS021,Rice Low Input,Haryana,Haryana,rice,1.95,2,28,1.1,0,0,1,0.83
+VCS022,Wheat Early Sowing,Punjab,Punjab,wheat,1.9,2,31,1.08,0,1,0,0.84
+VCS023,Cotton Rainwater,Karnataka,Karnataka,cotton,1.1,1,26,0.82,0,0,1,0.76
+VCS024,Chickpea Conservation,Maharashtra,Maharashtra,chickpea,0.95,1,25,0.88,0,1,0,0.75
+VCS025,Sugarcane Water Efficient,Karnataka,Karnataka,sugarcane,2.6,3,39,1.45,0,1,1,0.90

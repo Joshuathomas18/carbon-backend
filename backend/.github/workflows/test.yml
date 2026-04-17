@@ -1,0 +1,128 @@
+name: Tests & Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.3
+        env:
+          POSTGRES_USER: carbon_user
+          POSTGRES_PASSWORD: carbon_password
+          POSTGRES_DB: carbon_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint with ruff
+        run: ruff check app tests
+
+      - name: Format check with black
+        run: black --check app tests
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://carbon_user:carbon_password@localhost:5432/carbon_db
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          pytest -v --cov=app --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          tags: carbon-backend:latest
+          cache-from: type=registry,ref=carbon-backend:buildcache
+          cache-to: type=registry,ref=carbon-backend:buildcache,mode=max
+
+      - name: Run container tests
+        run: |
+          docker build -t carbon-backend:test .
+          docker run --rm carbon-backend:test pytest tests/unit/test_health.py
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run Bandit security checks
+        run: |
+          pip install bandit
+          bandit -r app -f json -o bandit.json || true
+
+      - name: Run safety checks
+        run: |
+          pip install safety
+          safety check --json || true
+
+  docker-build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Build and test Docker image
+        run: |
+          docker build -t carbon-backend:${{ github.sha }} .
+          docker run --rm carbon-backend:${{ github.sha }} /bin/bash -c "python -m pytest tests/unit/test_health.py"
+
+      - name: Tag for registry (optional)
+        run: |
+          docker tag carbon-backend:${{ github.sha }} carbon-backend:latest
+          echo "Ready to push to GCR/ECR if credentials available"

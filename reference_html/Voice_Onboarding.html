@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Kisan Carbon - Voice Navigation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700;800&amp;family=Be+Vietnam+Pro:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#404940",
+                    "surface-container": "#edeeef",
+                    "tertiary": "#004a36",
+                    "on-tertiary-container": "#93debe",
+                    "surface-variant": "#e1e3e4",
+                    "inverse-surface": "#2e3132",
+                    "on-background": "#191c1d",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-fixed": "#002116",
+                    "background": "#f8f9fa",
+                    "outline": "#707a6f",
+                    "surface-dim": "#d9dadb",
+                    "on-secondary": "#ffffff",
+                    "tertiary-fixed": "#a6f2d1",
+                    "on-tertiary": "#ffffff",
+                    "on-surface": "#191c1d",
+                    "tertiary-fixed-dim": "#8bd6b6",
+                    "on-secondary-container": "#682c00",
+                    "on-tertiary-fixed-variant": "#00513b",
+                    "surface-tint": "#006d30",
+                    "on-secondary-fixed": "#331200",
+                    "inverse-on-surface": "#f0f1f2",
+                    "secondary-fixed": "#ffdbca",
+                    "primary": "#004c1f",
+                    "on-primary-fixed": "#00210a",
+                    "error-container": "#ffdad6",
+                    "surface-container-highest": "#e1e3e4",
+                    "on-primary-container": "#81e394",
+                    "secondary-container": "#fd8a42",
+                    "surface-container-low": "#f3f4f5",
+                    "surface-bright": "#f8f9fa",
+                    "tertiary-container": "#11644b",
+                    "surface": "#f8f9fa",
+                    "on-error": "#ffffff",
+                    "on-primary-fixed-variant": "#005323",
+                    "secondary-fixed-dim": "#ffb68e",
+                    "secondary": "#9b4500",
+                    "surface-container-high": "#e7e8e9",
+                    "primary-fixed-dim": "#79db8d",
+                    "primary-fixed": "#95f8a7",
+                    "on-secondary-fixed-variant": "#763300",
+                    "on-primary": "#ffffff",
+                    "inverse-primary": "#79db8d",
+                    "error": "#ba1a1a",
+                    "primary-container": "#00662d",
+                    "outline-variant": "#bfc9bd",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Lexend"],
+                    "body": ["Be Vietnam Pro"],
+                    "label": ["Be Vietnam Pro"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bg-organic-gradient {
+            background: linear-gradient(135deg, #004c1f 0%, #00662d 100%);
+        }
+        .mic-pulse {
+            box-shadow: 0 0 0 0 rgba(0, 76, 31, 0.4);
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 76, 31, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 40px rgba(0, 76, 31, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 76, 31, 0); }
+        }
+        .waveform-bar {
+            animation: wave 1.2s ease-in-out infinite;
+        }
+        @keyframes wave {
+            0%, 100% { height: 8px; }
+            50% { height: 32px; }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 left-0 w-full flex justify-between items-center px-6 py-4 h-20 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md z-50 shadow-sm dark:shadow-none">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="eco" style="font-variation-settings: 'FILL' 1;">eco</span>
+<h1 class="text-2xl font-bold tracking-tight text-emerald-900 dark:text-emerald-100 font-headline">Kisan Carbon</h1>
+</div>
+<div class="flex items-center gap-3">
+<div class="hidden md:flex gap-4 px-4 py-2 bg-surface-container rounded-full">
+<button class="text-emerald-900 font-bold text-sm">EN</button>
+<button class="text-zinc-500 hover:text-emerald-800 text-sm">HI</button>
+<button class="text-zinc-500 hover:text-emerald-800 text-sm">KN</button>
+<button class="text-zinc-500 hover:text-emerald-800 text-sm">PU</button>
+</div>
+<button class="md:hidden flex items-center justify-center w-12 h-12 bg-surface-container rounded-full">
+<span class="material-symbols-outlined text-on-surface" data-icon="language">language</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-primary/10">
+<img alt="Farmer Profile" class="w-full h-full object-cover" data-alt="portrait of a confident smiling Indian farmer wearing a traditional turban in soft natural outdoor daylight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhI2q_DIGl9pRcXDHL3rLZRBYkN9z22KPnsVMz83ruXA5S4PcM2lO--ic6kXhPSY2pUwhFhgibGorztnpb8SzOsgY24VwplfP7zFHeLsxuVmFVmVLLjh_o4yTXuc-A0yZjCea2izQSBLaHEJWUaRFJXehs2neBh7Mb7Tx-B5TkFBLgX3ESlE_chtIX3P_-P5eUz2FBcWbyCr898Da-ENtWnxSnKcsnuqk3w4feBHLqW9cerMoIKYimGtUuMjD4ZDjt4DRy1pJMvDU"/>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-[480px] mx-auto min-h-screen flex flex-col items-center">
+<!-- Hero Section -->
+<section class="w-full text-center mb-12 mt-4">
+<h2 class="text-4xl font-extrabold font-headline leading-[1.1] text-primary mb-6">
+                Find out how much money your soil can make.
+            </h2>
+<div class="relative w-full h-48 rounded-tr-[3rem] rounded-bl-[3rem] overflow-hidden bg-surface-container-low">
+<img alt="Farm Illustration" class="w-full h-full object-cover opacity-80 mix-blend-multiply" data-alt="lush green agricultural landscape with terraced fields and soft rolling hills under a clear blue morning sky" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpyfM4Ajk-imJNloYAjj2z5gFSehGS9a7ISTeM1w7rrvMNRNK0Aw8jQ3MyiIQjk_YwyEGmJAOH7M24jvhpDO4kQPVwv29UU3ukbQzaRT4dsv1F2sajFzGA-hotzHRy_VzDpGhrBepuS-TMaWpGy4SquDjqDQCCEAZQCOIy8ZUlDYjB84B7LqwhdGxx3HWR5t6bQi1pX1vNHkO8ioGW565jMFme35Inutnv6yGDhCYU-YrE6Sdac2E59Wf5CLIZrr9aRBCh7ww22F8"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-low via-transparent to-transparent"></div>
+</div>
+</section>
+<!-- Voice Interaction Hub -->
+<section class="flex-grow flex flex-col items-center justify-center w-full space-y-12">
+<!-- Voice Input Hub Component -->
+<div class="relative flex items-center justify-center">
+<!-- Background Pulse -->
+<div class="absolute w-40 h-40 bg-primary/10 rounded-full animate-ping"></div>
+<!-- Main FAB -->
+<button class="relative z-10 w-32 h-32 rounded-full bg-organic-gradient flex items-center justify-center text-white shadow-2xl shadow-primary/40 active:scale-90 transition-transform duration-150 mic-pulse">
+<span class="material-symbols-outlined text-5xl" data-icon="mic" style="font-variation-settings: 'FILL' 1;">mic</span>
+</button>
+</div>
+<!-- Waveform Animation & Instruction -->
+<div class="text-center space-y-4">
+<div class="flex items-center justify-center gap-1.5 h-8">
+<div class="w-1.5 bg-primary rounded-full waveform-bar" style="animation-delay: 0.1s"></div>
+<div class="w-1.5 bg-primary rounded-full waveform-bar" style="animation-delay: 0.3s"></div>
+<div class="w-1.5 bg-primary rounded-full waveform-bar" style="animation-delay: 0.2s"></div>
+<div class="w-1.5 bg-primary rounded-full waveform-bar" style="animation-delay: 0.4s"></div>
+<div class="w-1.5 bg-primary rounded-full waveform-bar" style="animation-delay: 0.1s"></div>
+</div>
+<p class="text-xl font-semibold font-body text-primary tracking-tight">Tap to tell us about your farm</p>
+<p class="text-on-surface-variant text-sm px-8 leading-relaxed">
+                    "I have 5 acres of wheat in Punjab and I use organic fertilizer."
+                </p>
+</div>
+</section>
+<!-- Secondary Action -->
+<footer class="w-full mt-12 mb-8">
+<button class="w-full min-h-[64px] rounded-xl bg-surface-container-highest border border-outline-variant/20 flex items-center justify-center gap-3 px-6 hover:bg-surface-container-high transition-colors active:scale-[0.98]">
+<span class="material-symbols-outlined text-secondary text-2xl" data-icon="location_on">location_on</span>
+<span class="text-lg font-bold font-headline text-secondary">Use GPS to locate my farm</span>
+</button>
+</footer>
+</main>
+<!-- BottomNavBar Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-8 pt-4 h-28 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md rounded-t-[3rem] shadow-[0_-8px_30px_rgb(0,0,0,0.06)] dark:shadow-none">
+<a class="flex flex-col items-center justify-center bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-100 rounded-2xl px-6 py-3 scale-90" href="#">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="text-xs font-semibold font-label mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 px-6 py-3 hover:text-emerald-800" href="#">
+<span class="material-symbols-outlined" data-icon="map">map</span>
+<span class="text-xs font-semibold font-label mt-1">Farm</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 px-6 py-3 hover:text-emerald-800" href="#">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+<span class="text-xs font-semibold font-label mt-1">Chat</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-500 dark:text-zinc-400 px-6 py-3 hover:text-emerald-800" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="text-xs font-semibold font-label mt-1">Earnings</span>
+</a>
+</nav>
+</body></html>
