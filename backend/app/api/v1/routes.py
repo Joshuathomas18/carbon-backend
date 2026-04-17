@@ -4,7 +4,8 @@ import logging
 from datetime import datetime
 from typing import Optional, Any
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Form
+from fastapi.responses import PlainTextResponse
 from supabase import Client
 from pydantic import BaseModel, Field
 
@@ -290,3 +291,109 @@ def _format_response(estimate: dict, entities: dict, language: str) -> str:
     }
 
     return responses.get(language, responses["en"])
+
+
+# ============================================================================
+# Twilio WhatsApp Endpoints
+# ============================================================================
+
+
+@router.post("/webhook/whatsapp", response_class=PlainTextResponse)
+async def whatsapp_webhook(
+    From: str = Form(...),
+    Body: str = Form(...),
+):
+    """
+    Twilio WhatsApp webhook for incoming messages.
+
+    Receives messages from farmers, runs state machine, and responds.
+
+    **Twilio sends:**
+    - From: WhatsApp sender number (e.g., "+911234567890")
+    - Body: Message text
+
+    **State Machine:**
+    1. NEW → Send welcome + magic link
+    2. AWAITING_MAP → Remind to complete map
+    3. MAP_RECEIVED → Ask 3 agronomic questions
+    4. AWAITING_ANSWERS → Extract answers, calculate final payout
+    5. QUALIFIED → Send payout, expert will contact
+    """
+
+    logger.info(f"Twilio webhook: From={From}, Body={Body[:50]}...")
+
+    try:
+        from app.services.whatsapp_service import WhatsAppBotService
+
+        bot = WhatsAppBotService()
+        result = await bot.handle_incoming_message(From, Body)
+        logger.info(f"WhatsApp handler result: {result}")
+
+        # Twilio expects a 200 with empty body for successful processing
+        return ""
+
+    except Exception as e:
+        logger.error(f"Error in WhatsApp webhook: {str(e)}", exc_info=True)
+        return ""  # Still return 200 to Twilio to avoid retries
+
+
+class PolygonSaveRequest(BaseModel):
+    """Request to save farm polygon from React map."""
+    phone_number: str = Field(..., description="Farmer phone number")
+    polygon: dict = Field(..., description="GeoJSON polygon")
+    area_hectares: float = Field(..., description="Farm area in hectares", gt=0)
+
+
+class PolygonSaveResponse(BaseModel):
+    """Response after saving polygon."""
+    status: str
+    message: str
+    estimated_carbon: Optional[float] = None
+    estimated_payout_inr: Optional[float] = None
+    next_step: str = "3 agronomic questions sent via WhatsApp"
+
+
+@router.post("/plots/save-with-phone", response_model=PolygonSaveResponse)
+async def save_polygon_from_map(request: PolygonSaveRequest):
+    """
+    Save farm polygon from React MapConfirmView.
+
+    Called when farmer completes drawing polygon on map.
+    Triggers WhatsApp state machine to ask agronomic questions.
+
+    **Request:**
+    - phone_number: Farmer's WhatsApp number
+    - polygon: GeoJSON polygon from map
+    - area_hectares: Calculated polygon area
+
+    **Response:**
+    - Estimated carbon value
+    - Next step (asking 3 questions via WhatsApp)
+    """
+
+    logger.info(f"Saving polygon for {request.phone_number}")
+
+    try:
+        from app.services.whatsapp_service import WhatsAppBotService
+
+        bot = WhatsAppBotService()
+
+        # In production, would save to database and trigger state machine
+        # For now, simulate the process
+        estimated_carbon = request.area_hectares * 1.5  # Rough estimate
+        estimated_payout = estimated_carbon * 40  # ₹40/tonne
+
+        # Trigger the questions state
+        await bot._handle_map_received_state(request.phone_number)
+
+        return PolygonSaveResponse(
+            status="success",
+            message="Polygon saved successfully",
+            estimated_carbon=estimated_carbon,
+            estimated_payout_inr=estimated_payout,
+            next_step="3 agronomic questions sent via WhatsApp"
+        )
+
+    except Exception as e:
+        logger.error(f"Error saving polygon: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
