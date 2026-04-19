@@ -452,18 +452,18 @@ async def save_polygon_from_map(
 
 
 @router.get("/sessions/{token}")
-async def get_session_phone(token: str, db: Client = Depends(get_supabase)):
+async def get_session_info(token: str, db: Client = Depends(get_supabase)):
     """
-    Retrieve phone number for a session token.
-    Used by React map to get farmer identity without exposing phone in URL.
+    Retrieve session info (phone and coordinates) for a session token.
+    Used by React map to center correctly and identify the farmer.
     """
     try:
         session_resp = db.table("sessions").select("phone, expires_at").eq("token", token).execute()
-
         if not session_resp.data:
             raise HTTPException(status_code=404, detail="Invalid or expired token")
 
         session = session_resp.data[0]
+        phone = session["phone"]
 
         # Check expiry
         expires_at_raw = session.get("expires_at")
@@ -472,10 +472,24 @@ async def get_session_phone(token: str, db: Client = Depends(get_supabase)):
             if datetime.utcnow() > expires_at:
                 raise HTTPException(status_code=401, detail="Token expired")
 
-        return {"phone": session["phone"]}
+        # Fetch farmer coordinates
+        farmer_resp = db.table("farmers").select("latitude, longitude").eq("phone", phone).execute()
+        coords = {"lat": 28.6139, "lon": 77.2090} # Default to Delhi
+        if farmer_resp.data:
+            f = farmer_resp.data[0]
+            coords = {
+                "lat": f.get("latitude") or 28.6139,
+                "lon": f.get("longitude") or 77.2090
+            }
 
+        return {
+            "phone": phone,
+            "lat": coords["lat"],
+            "lon": coords["lon"]
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error retrieving session: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
