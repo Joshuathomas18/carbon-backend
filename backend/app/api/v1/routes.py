@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime
+import html
 from typing import Optional, Any
 
 from fastapi import APIRouter, HTTPException, Query, Depends, Form
@@ -298,12 +299,11 @@ def _format_response(estimate: dict, entities: dict, language: str) -> str:
 # Twilio WhatsApp Endpoints
 # ============================================================================
 
+from fastapi import Request
+
 
 @router.post("/webhook/whatsapp")
-async def whatsapp_webhook(
-    From: str = Form(...),
-    Body: str = Form(...),
-):
+async def whatsapp_webhook(request: Request):
     """
     Twilio WhatsApp webhook for incoming messages.
     Returns TwiML MessagingResponse for immediate reply.
@@ -312,19 +312,38 @@ async def whatsapp_webhook(
     from twilio.twiml.messaging_response import MessagingResponse
     from app.services.whatsapp_service import WhatsAppBotService
 
-    logger.info(f"Twilio webhook: From={From}, Body={Body[:50]}...")
+    # 1. Get Form Data
+    form = await request.form()
+    phone_from = form.get("From", "")
+    message_body = form.get("Body", "")
+    
+    # 1.1 Capture Location Data
+    latitude = form.get("Latitude")
+    longitude = form.get("Longitude")
+    address = form.get("Address")
+    
+    metadata = {
+        "latitude": float(latitude) if latitude else None,
+        "longitude": float(longitude) if longitude else None,
+        "address": address
+    }
+
+    logger.info(f"Twilio webhook: From={phone_from}, Body={message_body[:50]}..., GPS={latitude},{longitude}")
 
     try:
         bot = WhatsAppBotService()
-        reply = await bot.handle_incoming_message(From, Body)
+        reply = await bot.handle_incoming_message(phone_from, message_body, metadata=metadata)
+        
+        # MessagingResponse will escape automatically, no need to double escape
+        safe_reply = reply
         logger.info(f"WhatsApp reply: {reply[:50]}...")
     except Exception as e:
         logger.error(f"Error in WhatsApp webhook: {str(e)}", exc_info=True)
-        reply = "Sorry, we encountered an error. Please try again later."
+        safe_reply = "Sorry, we encountered an error. Please try again later."
 
-    # Return TwiML response
+    # 3. Return TwiML response
     resp = MessagingResponse()
-    resp.message(reply)
+    resp.message(safe_reply)
 
     return Response(
         content=str(resp),
@@ -376,16 +395,22 @@ async def save_polygon_from_map(
             phone=request.phone_number
         )
 
-        # 3. Inform WhatsApp Bot to send questions
+        # 3. Inform WhatsApp Bot to send questions and update state
         bot = WhatsAppBotService()
-        await bot._handle_map_received_state(request.phone_number)
+        questions = await bot._handle_map_received_state(request.phone_number)
+        
+        # Actually send the message to the farmer
+        await bot.send_message(request.phone_number, questions)
+        
+        # Update state to AWAITING_ANSWERS
+        db.table("farmers").update({"bot_state": "AWAITING_ANSWERS"}).eq("phone", request.phone_number).execute()
 
         return PolygonSaveResponse(
             status="success",
-            message="Farm verified via satellite. Payout estimate calculated.",
+            message="Farm verified via satellite. Survey questions sent to WhatsApp.",
             estimated_carbon=estimate["total_tonnes_co2"],
             estimated_payout_inr=estimate["value_inr"],
-            next_step="3 agronomic questions sent via WhatsApp"
+            next_step="Please answer the 3 questions on WhatsApp to finalize."
         )
 
     except Exception as e:

@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, JSON, ForeignKey, create_mock_engine
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, JSON, ForeignKey, Boolean, create_mock_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, session
 from app.config import settings
@@ -29,6 +29,14 @@ class FarmerModel(Base):
     phone = Column(String, unique=True, nullable=False)
     wallet_address = Column(String, nullable=True)
     bot_state = Column(String, default="NEW")
+    language = Column(String, default="hinglish")
+    crop_type = Column(String, nullable=True)
+    expert_requested = Column(Boolean, default=False)
+    expert_ref_code = Column(String, nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    report_accuracy = Column(String, nullable=True)
+    session_expires_at = Column(DateTime, nullable=True)
     farm_polygon = Column(JSON, nullable=True)
     area_hectares = Column(Float, nullable=True)
     burned_stubble = Column(String, nullable=True)
@@ -116,10 +124,6 @@ class TableQueryShim:
                 items = self._payload if isinstance(self._payload, list) else [self._payload]
                 new_objects = []
                 for item in items:
-                    # Map 'metadata' to 'metadata_json' for Farmer if necessary
-                    if self.table_name == "farmers" and "metadata" in item:
-                        item["metadata_json"] = item.pop("metadata")
-                    
                     obj = self.model_class(**item)
                     session.add(obj)
                     new_objects.append(obj)
@@ -143,15 +147,25 @@ class TableQueryShim:
 
     def _to_dict(self, obj):
         """Helper to convert SQLAlchemy model to dict."""
-        d = {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
-        # Rename metadata_jsont back to metadata if farmer
-        if self.table_name == "farmers" and "metadata_json" in d:
-            d["metadata"] = d.pop("metadata_json")
-        return d
+        return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
 
 class SupabaseSQLiteShim:
     """Shim that provides the same interface as supabase-py but uses SQLite."""
-    def __init__(self, db_url="sqlite:///./carbon.db"):
+    def __init__(self, db_url=None):
+        if db_url is None:
+            # Fallback to absolute path in backend folder
+            base_dir = os.path.dirname(os.path.abspath(__file__)) # ...app/db
+            backend_dir = os.path.dirname(os.path.dirname(base_dir))
+            db_url = f"sqlite:///{os.path.join(backend_dir, 'carbon.db')}"
+            
+        if "./" in db_url:
+            # Convert relative to absolute based on backend directory
+            base_dir = os.path.dirname(os.path.abspath(__file__)) # ...app/db
+            backend_dir = os.path.dirname(os.path.dirname(base_dir))
+            db_name = db_url.split("./")[-1]
+            db_url = f"sqlite:///{os.path.join(backend_dir, db_name)}"
+
+        logger.info(f"SupabaseSQLiteShim initializing with {db_url}")
         self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         Base.metadata.create_all(bind=self.engine)

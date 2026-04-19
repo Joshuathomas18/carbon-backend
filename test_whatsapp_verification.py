@@ -14,16 +14,16 @@ def test_database_shim_is_correct():
     """Verify that supabase import is actually the SQLite shim, not Supabase client."""
     from app.db.database import supabase, SupabaseSQLiteShim, get_db_client
 
-    print("✓ Database shim import successful")
+    print("[OK] Database shim import successful")
 
     # Check it's the right type
     assert isinstance(supabase, SupabaseSQLiteShim), \
         f"Expected SupabaseSQLiteShim but got {type(supabase)}"
-    print("✓ supabase is SQLite shim (not Supabase client)")
+    print("[OK] supabase is SQLite shim (not Supabase client)")
 
     # Check it has the required methods
     assert hasattr(supabase, 'table'), "supabase missing table() method"
-    print("✓ supabase.table() method exists")
+    print("[OK] supabase.table() method exists")
 
     # Test that table() returns correct query interface
     farmers_query = supabase.table("farmers")
@@ -32,7 +32,7 @@ def test_database_shim_is_correct():
     assert hasattr(farmers_query, 'update'), "TableQueryShim missing update()"
     assert hasattr(farmers_query, 'eq'), "TableQueryShim missing eq()"
     assert hasattr(farmers_query, 'execute'), "TableQueryShim missing execute()"
-    print("✓ Fluent query interface (select/insert/update/eq/execute) working")
+    print("[OK] Fluent query interface (select/insert/update/eq/execute) working")
 
 
 def test_whatsapp_service_returns_string():
@@ -40,7 +40,7 @@ def test_whatsapp_service_returns_string():
     from app.services.whatsapp_service import WhatsAppBotService
     import inspect
 
-    print("\n✓ WhatsAppBotService imported")
+    print("\n[OK] WhatsAppBotService imported")
 
     # Check all handler methods return string (based on async annotation)
     service = WhatsAppBotService()
@@ -57,8 +57,8 @@ def test_whatsapp_service_returns_string():
         assert sig.return_annotation == str, \
             f"{method_name} doesn't return str, returns {sig.return_annotation}"
 
-    print("✓ All handler methods annotated to return str")
-    print("✓ handle_incoming_message() returns str (not dict)")
+    print("[OK] All handler methods annotated to return str")
+    print("[OK] handle_incoming_message() returns str (not dict)")
 
 
 def test_webhook_route_returns_twiml():
@@ -66,7 +66,7 @@ def test_webhook_route_returns_twiml():
     from fastapi.testclient import TestClient
     from app.main import app
 
-    print("\n✓ FastAPI app imported")
+    print("\n[OK] FastAPI app imported")
 
     client = TestClient(app)
 
@@ -81,24 +81,24 @@ def test_webhook_route_returns_twiml():
 
     print(f"  Response status: {response.status_code}")
     assert response.status_code == 200, f"Expected 200 but got {response.status_code}"
-    print("✓ Webhook returns 200 status")
+    print("[OK] Webhook returns 200 status")
 
     # Check it's XML
     assert "application/xml" in response.headers.get("content-type", ""), \
         f"Expected application/xml but got {response.headers.get('content-type')}"
-    print("✓ Response media type is application/xml")
+    print("[OK] Response media type is application/xml")
 
     # Check it contains TwiML structure
     assert "<Response>" in response.text, "Missing <Response> tag"
     assert "<Message>" in response.text, "Missing <Message> tag"
     assert "</Message>" in response.text, "Missing </Message> closing tag"
     assert "</Response>" in response.text, "Missing </Response> closing tag"
-    print("✓ Response contains valid TwiML structure")
+    print("[OK] Response contains valid TwiML structure")
 
     # Test 2: Verify it returns plain text inside message, not dict/JSON
     assert "{" not in response.text[response.text.index("<Message>"):response.text.index("</Message>")], \
         "Message should contain plain text, not JSON dict"
-    print("✓ Message contains plain text (not JSON dict)")
+    print("[OK] Message contains plain text (not JSON dict)")
 
 
 def test_exception_handling_returns_twiml():
@@ -106,7 +106,7 @@ def test_exception_handling_returns_twiml():
     from fastapi.testclient import TestClient
     from app.main import app
 
-    print("\n✓ Testing exception fallback handling")
+    print("\n[OK] Testing exception fallback handling")
 
     client = TestClient(app)
 
@@ -131,7 +131,7 @@ def test_exception_handling_returns_twiml():
     assert "<Response>" in response.text and "</Response>" in response.text, \
         "Should return valid TwiML structure even on error"
 
-    print("✓ Exception handling returns valid TwiML")
+    print("[OK] Exception handling returns valid TwiML")
 
 
 def test_endpoint_path_correct():
@@ -139,7 +139,7 @@ def test_endpoint_path_correct():
     from fastapi.testclient import TestClient
     from app.main import app
 
-    print("\n✓ Testing endpoint path")
+    print("\n[OK] Testing endpoint path")
 
     client = TestClient(app)
 
@@ -155,7 +155,7 @@ def test_endpoint_path_correct():
     assert response.status_code == 200, \
         f"Endpoint not found at /api/v1/webhook/whatsapp (got {response.status_code})"
 
-    print("✓ Endpoint mounted at /api/v1/webhook/whatsapp")
+    print("[OK] Endpoint mounted at /api/v1/webhook/whatsapp")
 
 
 def main():
@@ -181,9 +181,9 @@ def main():
 
         try:
             test_func()
-            print(f"\n✅ {test_name} PASSED")
+            print(f"\n[PASS] {test_name} PASSED")
         except Exception as e:
-            print(f"\n❌ {test_name} FAILED")
+            print(f"\n[FAIL] {test_name} FAILED")
             print(f"Error: {e}")
             failed.append((test_name, str(e)))
 
@@ -192,18 +192,13 @@ def main():
     print('=' * 70)
 
     if failed:
-        print(f"\n❌ {len(failed)} test(s) failed:")
+        print(f"\n[FAIL] {len(failed)} test(s) failed:")
         for test_name, error in failed:
             print(f"  - {test_name}: {error}")
         return 1
     else:
-        print("\n✅ All verifications PASSED!")
-        print("\n✓ Database shim correctly imported")
-        print("✓ Service returns plain text strings")
-        print("✓ Route always returns valid TwiML XML")
-        print("✓ Exception handling with fallback working")
-        print("✓ Endpoint path correct")
-        print("\n🚀 WhatsApp integration ready for testing!")
+        print("\n[PASS] All verifications PASSED!")
+        print("\n[READY] WhatsApp integration ready for testing!")
         return 0
 
 
