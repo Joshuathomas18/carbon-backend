@@ -410,29 +410,33 @@ async def save_polygon_from_map(
         from app.services.estimate_service import EstimateService
         from app.services.whatsapp_service import WhatsAppBotService
 
-        # 1. Parse Polygon and get Centroid for GEE
+        # 1. Parse Polygon and calculate area from geometry
         poly = shape(request.polygon)
         centroid = poly.centroid
+
+        # Auto-calculate area from polygon in square meters, convert to hectares
+        area_hectares = poly.area / 10000  # 1 hectare = 10000 m²
+
+        # Log area calculation for debugging
+        logger.info(f"Calculated area from polygon: {area_hectares:.2f} ha (polygon area: {poly.area:.1f} m²)")
 
         # 2. Trigger Full Satellite Pipeline
         service = EstimateService()
         estimate = await service.estimate_carbon(
             lat=centroid.y,
             lon=centroid.x,
-            area_hectares=request.area_hectares,
+            area_hectares=area_hectares,
             db=db,
             phone=phone
         )
 
-        # 3. Inform WhatsApp Bot to send questions and update state
+        # 3. Inform WhatsApp Bot to send crop question and update state
+        # _handle_map_received_state sets state to CROP_QUESTION and returns the question text
         bot = WhatsAppBotService()
-        questions = await bot._handle_map_received_state(phone)
+        questions = await bot._handle_map_received_state(phone, area_hectares=area_hectares)
 
-        # Actually send the message to the farmer
+        # Send the crop question message to farmer
         await bot.send_message(phone, questions)
-
-        # Update state to AWAITING_ANSWERS
-        db.table("farmers").update({"bot_state": "AWAITING_ANSWERS"}).eq("phone", phone).execute()
 
         return PolygonSaveResponse(
             status="success",

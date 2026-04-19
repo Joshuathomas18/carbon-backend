@@ -22,13 +22,14 @@ class WhatsAppBotService:
     """Manage 10-state WhatsApp bot for farmer onboarding."""
 
     # Map state codes to PRD states
+    # Note: AREA state removed - area auto-calculated from polygon boundary on React map
     STATES = {
         "NEW": "LANGUAGE_SELECTION",
         "LANGUAGE_SELECTION": "GREETING",
         "GREETING": "LOCATION",
         "LOCATION": "LOCATION_CONFIRM",
-        "LOCATION_CONFIRM": "AREA",
-        "AREA": "CROP_QUESTION",
+        "LOCATION_CONFIRM": "BOUNDARY_PENDING",  # Waiting for polygon from React map
+        "BOUNDARY_PENDING": "CROP_QUESTION",     # After map polygon saved, area auto-calculated
         "CROP_QUESTION": "UREA_QUESTION",
         "UREA_QUESTION": "BURNING_QUESTION",
         "BURNING_QUESTION": "SUMMARY",
@@ -208,23 +209,44 @@ class WhatsAppBotService:
                 }).execute()
 
                 magic_link = f"{self.frontend_url}/map?token={session_token}"
-                self.db.table("farmers").update({"bot_state": "AREA"}).eq("phone", phone).execute()
-                return get_text("area_prompt", lang=lang, link=magic_link)
+                # Skip AREA state entirely - area will be auto-calculated from polygon boundary
+                self.db.table("farmers").update({"bot_state": "BOUNDARY_PENDING"}).eq("phone", phone).execute()
+
+                # Send magic link with instructions to draw boundary
+                boundary_message = (
+                    "Shukriya! 🎉\n\n"
+                    "Ab apne farm ka boundary map par draw karein:\n\n"
+                    f"🔗 *Link:* {magic_link}\n\n"
+                    "Boundary draw karne ke baad, apne urea bags, burning practice, aur zero-till ke baare mein 3 questions aayenge.\n\n"
+                    "Link 24 hours ke liye valid hai."
+                )
+                if lang == "english":
+                    boundary_message = (
+                        "Thank you! 🎉\n\n"
+                        "Now draw your farm boundary on the map:\n\n"
+                        f"🔗 *Link:* {magic_link}\n\n"
+                        "After you draw the boundary, you'll receive 3 quick questions about your urea usage, burning practices, and zero-tillage.\n\n"
+                        "The link is valid for 24 hours."
+                    )
+                return boundary_message
             else:
                 self.db.table("farmers").update({"bot_state": "LOCATION"}).eq("phone", phone).execute()
                 return get_text("location_prompt", lang=lang)
 
-        # State 4: AREA
-        elif state == "AREA":
-            area_data = self._smart_extract_area(text)
-            if area_data["value"] is None:
-                return get_text("area_retry", lang=lang)
-            
-            self.db.table("farmers").update({
-                "area_hectares": area_data["value"],
-                "bot_state": "CROP_QUESTION"
-            }).eq("phone", phone).execute()
-            return get_text("crop_prompt", lang=lang)
+        # State 4: BOUNDARY_PENDING (Waiting for polygon from React map)
+        elif state == "BOUNDARY_PENDING":
+            # User shouldn't send messages in this state (they should be drawing map)
+            # But if they do, remind them
+            reminder = (
+                "Please complete drawing your farm boundary on the map link we sent you. 🗺️\n\n"
+                "Once you're done drawing and save, we'll send you the next questions."
+            )
+            if lang == "english":
+                reminder = (
+                    "Please complete drawing your farm boundary on the map link we sent you. 🗺️\n\n"
+                    "Once you're done drawing and save, we'll send you the next questions."
+                )
+            return reminder
 
         # State 5: CROP_QUESTION
         elif state == "CROP_QUESTION":
@@ -283,6 +305,36 @@ class WhatsAppBotService:
                 return get_text("finish", lang=lang)
 
         return get_text("welcome", lang="hinglish")
+
+    async def _handle_map_received_state(self, phone: str, area_hectares: float = None) -> str:
+        """
+        Called when polygon boundary is saved from React map.
+        Auto-calculates area from polygon, then sends CROP_QUESTION.
+        """
+        try:
+            # Fetch farmer to get language and current state
+            farmer_resp = self.db.table("farmers").select("*").eq("phone", phone).execute()
+            if not farmer_resp.data:
+                logger.warning(f"Farmer not found: {phone}")
+                return "Farm polygon saved, but farmer profile not found."
+
+            farmer = farmer_resp.data[0]
+            lang = farmer.get("language", "hinglish")
+
+            # Update state: BOUNDARY_PENDING → CROP_QUESTION
+            # Store area if provided (from polygon geometry)
+            update_data = {"bot_state": "CROP_QUESTION"}
+            if area_hectares is not None:
+                update_data["area_hectares"] = area_hectares
+
+            self.db.table("farmers").update(update_data).eq("phone", phone).execute()
+
+            # Send crop question
+            return get_text("crop_prompt", lang=lang)
+
+        except Exception as e:
+            logger.error(f"Error handling map received: {str(e)}", exc_info=True)
+            return "Error processing your farm boundary. Please try again."
 
     def _match_choice(self, text: str, options: Dict[str, str]) -> Optional[str]:
         """Fuzzy match numerical options or keywords."""
