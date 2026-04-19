@@ -33,11 +33,14 @@ services:
     build: .
     container_name: carbon-api
     environment:
-      DATABASE_URL: postgresql+asyncpg://carbon_user:carbon_password@postgres:5432/carbon_db
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
       GEE_PROJECT_ID: ${GEE_PROJECT_ID}
+      GEE_SERVICE_ACCOUNT_JSON: ${GEE_SERVICE_ACCOUNT_JSON}
       SARVAM_API_KEY: ${SARVAM_API_KEY}
-      ENVIRONMENT: development
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+      ENVIRONMENT: ${ENVIRONMENT}
     ports:
       - "8000:8000"
     depends_on:

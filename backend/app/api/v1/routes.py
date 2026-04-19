@@ -10,6 +10,7 @@ from supabase import Client
 from pydantic import BaseModel, Field
 
 from app.db.database import get_supabase
+from shapely.geometry import shape
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -298,43 +299,37 @@ def _format_response(estimate: dict, entities: dict, language: str) -> str:
 # ============================================================================
 
 
-@router.post("/webhook/whatsapp", response_class=PlainTextResponse)
+@router.post("/webhook/whatsapp")
 async def whatsapp_webhook(
     From: str = Form(...),
     Body: str = Form(...),
 ):
     """
     Twilio WhatsApp webhook for incoming messages.
-
-    Receives messages from farmers, runs state machine, and responds.
-
-    **Twilio sends:**
-    - From: WhatsApp sender number (e.g., "+911234567890")
-    - Body: Message text
-
-    **State Machine:**
-    1. NEW → Send welcome + magic link
-    2. AWAITING_MAP → Remind to complete map
-    3. MAP_RECEIVED → Ask 3 agronomic questions
-    4. AWAITING_ANSWERS → Extract answers, calculate final payout
-    5. QUALIFIED → Send payout, expert will contact
+    Returns TwiML MessagingResponse for immediate reply.
     """
+    from fastapi import Response
+    from twilio.twiml.messaging_response import MessagingResponse
+    from app.services.whatsapp_service import WhatsAppBotService
 
     logger.info(f"Twilio webhook: From={From}, Body={Body[:50]}...")
 
     try:
-        from app.services.whatsapp_service import WhatsAppBotService
-
         bot = WhatsAppBotService()
-        result = await bot.handle_incoming_message(From, Body)
-        logger.info(f"WhatsApp handler result: {result}")
-
-        # Twilio expects a 200 with empty body for successful processing
-        return ""
-
+        reply = await bot.handle_incoming_message(From, Body)
+        logger.info(f"WhatsApp reply: {reply[:50]}...")
     except Exception as e:
         logger.error(f"Error in WhatsApp webhook: {str(e)}", exc_info=True)
-        return ""  # Still return 200 to Twilio to avoid retries
+        reply = "Sorry, we encountered an error. Please try again later."
+
+    # Return TwiML response
+    resp = MessagingResponse()
+    resp.message(reply)
+
+    return Response(
+        content=str(resp),
+        media_type="application/xml"
+    )
 
 
 class PolygonSaveRequest(BaseModel):
@@ -354,43 +349,42 @@ class PolygonSaveResponse(BaseModel):
 
 
 @router.post("/plots/save-with-phone", response_model=PolygonSaveResponse)
-async def save_polygon_from_map(request: PolygonSaveRequest):
+async def save_polygon_from_map(
+    request: PolygonSaveRequest,
+    db: Client = Depends(get_supabase)
+):
     """
-    Save farm polygon from React MapConfirmView.
-
-    Called when farmer completes drawing polygon on map.
-    Triggers WhatsApp state machine to ask agronomic questions.
-
-    **Request:**
-    - phone_number: Farmer's WhatsApp number
-    - polygon: GeoJSON polygon from map
-    - area_hectares: Calculated polygon area
-
-    **Response:**
-    - Estimated carbon value
-    - Next step (asking 3 questions via WhatsApp)
+    Save farm polygon and trigger GEE estimate.
     """
-
     logger.info(f"Saving polygon for {request.phone_number}")
 
     try:
+        from app.services.estimate_service import EstimateService
         from app.services.whatsapp_service import WhatsAppBotService
 
+        # 1. Parse Polygon and get Centroid for GEE
+        poly = shape(request.polygon)
+        centroid = poly.centroid
+        
+        # 2. Trigger Full Satellite Pipeline
+        service = EstimateService()
+        estimate = await service.estimate_carbon(
+            lat=centroid.y,
+            lon=centroid.x,
+            area_hectares=request.area_hectares,
+            db=db,
+            phone=request.phone_number
+        )
+
+        # 3. Inform WhatsApp Bot to send questions
         bot = WhatsAppBotService()
-
-        # In production, would save to database and trigger state machine
-        # For now, simulate the process
-        estimated_carbon = request.area_hectares * 1.5  # Rough estimate
-        estimated_payout = estimated_carbon * 40  # ₹40/tonne
-
-        # Trigger the questions state
         await bot._handle_map_received_state(request.phone_number)
 
         return PolygonSaveResponse(
             status="success",
-            message="Polygon saved successfully",
-            estimated_carbon=estimated_carbon,
-            estimated_payout_inr=estimated_payout,
+            message="Farm verified via satellite. Payout estimate calculated.",
+            estimated_carbon=estimate["total_tonnes_co2"],
+            estimated_payout_inr=estimate["value_inr"],
             next_step="3 agronomic questions sent via WhatsApp"
         )
 

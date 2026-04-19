@@ -22,6 +22,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomeView />} />
           <Route path="/discover" element={<MapConfirmView plotData={plotData} setResults={setResults} />} />
+          <Route path="/map" element={<MapConfirmView plotData={plotData} setResults={setResults} />} />
           <Route path="/assistant" element={<VoiceChatView setResults={setResults} />} />
           <Route path="/impact" element={<ResultsView results={results} />} />
           <Route path="/history" element={<HistoryView />} />

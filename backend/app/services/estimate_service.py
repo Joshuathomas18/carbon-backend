@@ -46,6 +46,8 @@ class EstimateService:
         db: Optional[Any] = None,
         phone: str = "",
         language: str = "hi",
+        zero_till: bool = False,
+        burned_stubble: bool = False,
     ) -> dict:
         """
         Estimate carbon sequestration for a plot and save to database.
@@ -80,13 +82,17 @@ class EstimateService:
             }
             
             project_data = {
-                "soc_percent": soil_org_carbon_baseline + 0.15,
+                "soc_percent": soil_org_carbon_baseline + (0.15 if zero_till else 0.10),
                 "bulk_density": bulk_density,
                 "area_ha": area_hectares,
                 "urea_kg": 150 * area_hectares,
                 "burn_residue_kg": 0,
             }
 
+            # Override satellite detection if farmer explicitly confirmed zero-burn on WhatsApp
+            if burned_stubble == False:
+                baseline_data["burn_residue_kg"] = (2000 * area_hectares) # Treat as avoidment
+            
             vcu_results = calculate_final_vcu(baseline_data, project_data)
             total_tonnes = vcu_results["total_vcu"]
             tonnes_per_hectare = vcu_results["vcu_per_ha"]
@@ -105,14 +111,23 @@ class EstimateService:
                     farmer_insert = {
                         "phone": phone,
                         "name": "Smallholder Farmer",
-                        "wallet_address": "0x..." # Placeholder
+                        "wallet_address": "0x...",
+                        "bot_state": "QUALIFIED",
+                        "zero_till": "yes" if zero_till else "no",
+                        "burned_stubble": "no" if not burned_stubble else "yes"
                     }
                     new_farmer = db.table("farmers").insert(farmer_insert).execute()
                     farmer_id = new_farmer.data[0]["id"]
                 elif farmer_data:
                     farmer_id = farmer_data[0]["id"]
+                    # Update existing farmer status
+                    db.table("farmers").update({
+                        "bot_state": "QUALIFIED",
+                        "zero_till": "yes" if zero_till else "no",
+                        "burned_stubble": "no" if not burned_stubble else "yes"
+                    }).eq("id", farmer_id).execute()
                 else:
-                    farmer_id = 1 # Default or anonymous
+                    farmer_id = 1
 
                 # Create Plot record (using point/box as simple WKT)
                 # Note: Supabase/PostGIS accepts GeoJSON or WKT strings

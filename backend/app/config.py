@@ -21,12 +21,19 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://carbon_user:carbon_password@localhost:5432/carbon_db"
     DATABASE_ECHO: bool = False
     
+    # Redis
+    REDIS_URL: Optional[str] = None
+
     # Supabase (Optional)
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
 
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # Twilio WhatsApp
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Google Earth Engine
     GEE_PROJECT_ID: str = ""
@@ -68,6 +75,7 @@ class Settings(BaseSettings):
         env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"
 
 
 @lru_cache()
