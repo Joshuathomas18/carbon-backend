@@ -180,7 +180,8 @@ class SupabaseSQLiteShim:
         self.table_map = {
             "farmers": FarmerModel,
             "plots": PlotModel,
-            "carbon_scores": CarbonScoreModel
+            "carbon_scores": CarbonScoreModel,
+            "sessions": SessionModel
         }
 
     def table(self, table_name: str):
