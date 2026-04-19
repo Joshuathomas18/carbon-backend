@@ -389,9 +389,9 @@ async def save_polygon_from_map(
             session_resp = db.table("sessions").select("phone, expires_at").eq("token", request.token).execute()
             if session_resp.data:
                 session = session_resp.data[0]
-                expires_at_str = session.get("expires_at")
-                if expires_at_str:
-                    expires_at = datetime.fromisoformat(expires_at_str)
+                expires_at_raw = session.get("expires_at")
+                if expires_at_raw:
+                    expires_at = datetime.fromisoformat(expires_at_raw) if isinstance(expires_at_raw, str) else expires_at_raw
                     if datetime.utcnow() > expires_at:
                         raise HTTPException(status_code=401, detail="Token expired")
                 phone = session["phone"]
@@ -466,9 +466,9 @@ async def get_session_phone(token: str, db: Client = Depends(get_supabase)):
         session = session_resp.data[0]
 
         # Check expiry
-        expires_at_str = session.get("expires_at")
-        if expires_at_str:
-            expires_at = datetime.fromisoformat(expires_at_str)
+        expires_at_raw = session.get("expires_at")
+        if expires_at_raw:
+            expires_at = datetime.fromisoformat(expires_at_raw) if isinstance(expires_at_raw, str) else expires_at_raw
             if datetime.utcnow() > expires_at:
                 raise HTTPException(status_code=401, detail="Token expired")
 

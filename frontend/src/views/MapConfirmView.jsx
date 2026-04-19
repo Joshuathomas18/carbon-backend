@@ -7,6 +7,7 @@ import { estimateCarbon } from '../api/carbonApi';
 const MapConfirmView = ({ plotData, setResults }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [tokenLoading, setTokenLoading] = useState(false);
   const [error, setError] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState(null);
   const [sessionToken, setSessionToken] = useState(null);
@@ -19,24 +20,50 @@ const MapConfirmView = ({ plotData, setResults }) => {
 
     if (token) {
       setSessionToken(token);
-      // Fetch phone from secure session endpoint (no phone in URL)
+      setTokenLoading(true);
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
       fetch(`${apiBaseUrl}/sessions/${token}`)
-        .then(r => r.json())
+        .then(r => {
+          if (!r.ok) throw new Error(r.status === 401 ? "Magic link has expired" : "Invalid magic link");
+          return r.json();
+        })
         .then(data => {
+          if (!data.phone) throw new Error("Session returned no phone number");
           setPhoneNumber(data.phone);
-          console.log("✅ WhatsApp Magic Link detected! (Token-based, phone hidden from URL)");
         })
         .catch(e => {
-          console.error("Failed to retrieve phone from token:", e);
-          setError("Invalid or expired magic link");
-        });
+          console.error("Token lookup failed:", e);
+          setError(e.message || "Invalid or expired magic link. Please request a new one from WhatsApp.");
+        })
+        .finally(() => setTokenLoading(false));
     } else if (legacyPhone) {
-      // Legacy support: phone in URL (for backward compatibility)
       setPhoneNumber(legacyPhone);
-      console.log("✅ WhatsApp Magic Link detected! Phone:", legacyPhone);
     }
   }, []);
+
+  // Show loading spinner while resolving session token
+  if (tokenLoading) {
+    return (
+      <div className="flex flex-col h-full bg-[#FCF9F1] items-center justify-center space-y-4">
+        <Loader2 className="animate-spin text-green-700" size={40} />
+        <p className="text-gray-500 font-medium">Verifying your magic link...</p>
+      </div>
+    );
+  }
+
+  // Show clear error if token lookup failed (no blank page)
+  if (error && !phoneNumber && sessionToken) {
+    return (
+      <div className="flex flex-col h-full bg-[#FCF9F1] items-center justify-center p-8 space-y-6">
+        <div className="text-5xl">⚠️</div>
+        <h2 className="text-2xl font-black text-gray-900 text-center">Link Issue</h2>
+        <p className="text-gray-500 text-center font-medium">{error}</p>
+        <p className="text-sm text-gray-400 text-center">
+          Go back to WhatsApp and reply with your location again to get a new link.
+        </p>
+      </div>
+    );
+  }
 
   // 🚀 NEW: Handle save from WhatsApp magic link
   const handleSaveFromWhatsApp = async () => {
