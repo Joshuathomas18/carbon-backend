@@ -345,15 +345,21 @@ async def whatsapp_webhook(request: Request):
     resp = MessagingResponse()
     resp.message(safe_reply)
 
+    # Unescape HTML entities so WhatsApp displays properly
+    # TwiML escapes: ' → &#x27;, > → &gt;, etc.
+    # But WhatsApp doesn't unescape on display, so we must do it here
+    twiml_str = html.unescape(str(resp))
+
     return Response(
-        content=str(resp),
+        content=twiml_str,
         media_type="application/xml"
     )
 
 
 class PolygonSaveRequest(BaseModel):
     """Request to save farm polygon from React map."""
-    phone_number: str = Field(..., description="Farmer phone number")
+    phone_number: Optional[str] = Field(None, description="Farmer phone number (deprecated, use token)")
+    token: Optional[str] = Field(None, description="Session token from magic link")
     polygon: dict = Field(..., description="GeoJSON polygon")
     area_hectares: float = Field(..., description="Farm area in hectares", gt=0)
 
@@ -374,8 +380,31 @@ async def save_polygon_from_map(
 ):
     """
     Save farm polygon and trigger GEE estimate.
+    Supports both legacy phone_number and secure token-based requests.
     """
-    logger.info(f"Saving polygon for {request.phone_number}")
+    # Resolve phone from token or use direct phone_number
+    phone = None
+    if request.token:
+        try:
+            session_resp = db.table("sessions").select("phone, expires_at").eq("token", request.token).execute()
+            if session_resp.data:
+                session = session_resp.data[0]
+                expires_at_str = session.get("expires_at")
+                if expires_at_str:
+                    expires_at = datetime.fromisoformat(expires_at_str)
+                    if datetime.utcnow() > expires_at:
+                        raise HTTPException(status_code=401, detail="Token expired")
+                phone = session["phone"]
+        except Exception as e:
+            logger.warning(f"Token lookup failed: {e}")
+            phone = request.phone_number
+    else:
+        phone = request.phone_number
+
+    if not phone:
+        raise HTTPException(status_code=400, detail="Either token or phone_number required")
+
+    logger.info(f"Saving polygon for {phone}")
 
     try:
         from app.services.estimate_service import EstimateService
@@ -384,7 +413,7 @@ async def save_polygon_from_map(
         # 1. Parse Polygon and get Centroid for GEE
         poly = shape(request.polygon)
         centroid = poly.centroid
-        
+
         # 2. Trigger Full Satellite Pipeline
         service = EstimateService()
         estimate = await service.estimate_carbon(
@@ -392,18 +421,18 @@ async def save_polygon_from_map(
             lon=centroid.x,
             area_hectares=request.area_hectares,
             db=db,
-            phone=request.phone_number
+            phone=phone
         )
 
         # 3. Inform WhatsApp Bot to send questions and update state
         bot = WhatsAppBotService()
-        questions = await bot._handle_map_received_state(request.phone_number)
-        
+        questions = await bot._handle_map_received_state(phone)
+
         # Actually send the message to the farmer
-        await bot.send_message(request.phone_number, questions)
-        
+        await bot.send_message(phone, questions)
+
         # Update state to AWAITING_ANSWERS
-        db.table("farmers").update({"bot_state": "AWAITING_ANSWERS"}).eq("phone", request.phone_number).execute()
+        db.table("farmers").update({"bot_state": "AWAITING_ANSWERS"}).eq("phone", phone).execute()
 
         return PolygonSaveResponse(
             status="success",
@@ -415,4 +444,34 @@ async def save_polygon_from_map(
 
     except Exception as e:
         logger.error(f"Error saving polygon: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.get("/sessions/{token}")
+async def get_session_phone(token: str, db: Client = Depends(get_supabase)):
+    """
+    Retrieve phone number for a session token.
+    Used by React map to get farmer identity without exposing phone in URL.
+    """
+    try:
+        session_resp = db.table("sessions").select("phone, expires_at").eq("token", token).execute()
+
+        if not session_resp.data:
+            raise HTTPException(status_code=404, detail="Invalid or expired token")
+
+        session = session_resp.data[0]
+
+        # Check expiry
+        expires_at_str = session.get("expires_at")
+        if expires_at_str:
+            expires_at = datetime.fromisoformat(expires_at_str)
+            if datetime.utcnow() > expires_at:
+                raise HTTPException(status_code=401, detail="Token expired")
+
+        return {"phone": session["phone"]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving session: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

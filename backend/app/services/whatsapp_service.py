@@ -6,6 +6,7 @@ import os
 import re
 import random
 import asyncio
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
@@ -195,8 +196,18 @@ class WhatsAppBotService:
         elif state == "LOCATION_CONFIRM":
             choice = self._match_choice(text, {"1": "yes", "2": "no", "haan": "yes", "nahi": "no"})
             if choice == "yes":
-                # Updated path to /map as per frontend
-                magic_link = f"{self.frontend_url}/map?phone={phone}"
+                # Generate secure session token (no phone in URL)
+                session_token = secrets.token_urlsafe(12)
+                expires_at = datetime.utcnow() + timedelta(hours=24)
+
+                self.db.table("sessions").insert({
+                    "token": session_token,
+                    "phone": phone,
+                    "created_at": datetime.utcnow(),
+                    "expires_at": expires_at
+                }).execute()
+
+                magic_link = f"{self.frontend_url}/map?token={session_token}"
                 self.db.table("farmers").update({"bot_state": "AREA"}).eq("phone", phone).execute()
                 return get_text("area_prompt", lang=lang, link=magic_link)
             else:

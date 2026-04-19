@@ -9,14 +9,32 @@ const MapConfirmView = ({ plotData, setResults }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState(null);
+  const [sessionToken, setSessionToken] = useState(null);
 
-  // 🪄 MAGIC LINK: Grab phone number from URL on mount
+  // 🪄 MAGIC LINK: Grab token from URL and fetch phone securely on mount
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
-    const phone = queryParams.get("phone");
-    if (phone) {
-      setPhoneNumber(phone);
-      console.log("✅ WhatsApp Magic Link detected! Phone:", phone);
+    const token = queryParams.get("token");
+    const legacyPhone = queryParams.get("phone");
+
+    if (token) {
+      setSessionToken(token);
+      // Fetch phone from secure session endpoint (no phone in URL)
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+      fetch(`${apiBaseUrl}/sessions/${token}`)
+        .then(r => r.json())
+        .then(data => {
+          setPhoneNumber(data.phone);
+          console.log("✅ WhatsApp Magic Link detected! (Token-based, phone hidden from URL)");
+        })
+        .catch(e => {
+          console.error("Failed to retrieve phone from token:", e);
+          setError("Invalid or expired magic link");
+        });
+    } else if (legacyPhone) {
+      // Legacy support: phone in URL (for backward compatibility)
+      setPhoneNumber(legacyPhone);
+      console.log("✅ WhatsApp Magic Link detected! Phone:", legacyPhone);
     }
   }, []);
 
@@ -40,16 +58,24 @@ const MapConfirmView = ({ plotData, setResults }) => {
       };
 
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+      const payload = {
+        polygon: polygon,
+        area_hectares: plotData.area_hectares || 2.5
+      };
+
+      // Use token if available (secure), otherwise fall back to phone_number (legacy)
+      if (sessionToken) {
+        payload.token = sessionToken;
+      } else {
+        payload.phone_number = phoneNumber;
+      }
+
       const response = await fetch(`${apiBaseUrl}/plots/save-with-phone`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          phone_number: phoneNumber,
-          polygon: polygon,
-          area_hectares: plotData.area_hectares || 2.5
-        })
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {

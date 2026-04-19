@@ -73,6 +73,14 @@ class CarbonScoreModel(Base):
     breakdown = Column(JSON, default={})
     calculated_at = Column(DateTime, default=datetime.utcnow)
 
+class SessionModel(Base):
+    __tablename__ = "sessions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String, unique=True, nullable=False, index=True)
+    phone = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
 # ============================================================================
 # Supabase SDK Shim
 # ============================================================================
