@@ -82,12 +82,12 @@ const MapManager = ({ position, onPolygonChange }) => {
       templineStyle: { color: '#22c55e', fillOpacity: 0 },
     });
 
-    // AUTO-PLACE RECTANGLE ONCE
+    // AUTO-PLACE RECTANGLE ONCE - Make it much larger so it's visible
     const center = position || map.getCenter();
     const lat = center.lat || center[0];
     const lng = center.lng || center[1];
 
-    const delta = 0.001; 
+    const delta = 0.01; // ~1km square instead of 222m
     const bounds = [
       [lat - delta, lng - delta],
       [lat + delta, lng + delta]
@@ -95,11 +95,13 @@ const MapManager = ({ position, onPolygonChange }) => {
 
     const rect = L.rectangle(bounds, {
       color: '#ffff00',           // Bright yellow outline (highly visible on satellite)
-      weight: 3,
+      weight: 5,                  // Thicker line
       fillColor: '#00ff00',       // Bright green fill
       fillOpacity: 0.15,          // Transparent fill to see satellite underneath
       dashArray: '8, 4'           // Dashed pattern for clarity
     }).addTo(map);
+
+    console.log('Rectangle created:', { bounds, lat, lng, delta });
 
     // Enable editing AND dragging immediately
     rect.pm.enable({
