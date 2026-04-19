@@ -48,73 +48,87 @@ const calculateAreaHectares = (layer) => {
 // Component to handle map interactions and Geoman controls
 const MapManager = ({ position, onPolygonChange }) => {
   const map = useMap();
-  const initRef = useRef(false);
+  const rectRef = useRef(null);
 
   useEffect(() => {
-    if (!map || initRef.current) return;
-    initRef.current = true;
+    if (!map) return;
 
-    // Recenter map once at start
+    console.log('🟢 MapManager mounting, position:', position);
+
+    // Always remove any existing rectangle first (handles StrictMode double-mount)
+    if (rectRef.current) {
+      try {
+        map.removeLayer(rectRef.current);
+      } catch (e) { console.warn('Cleanup error:', e); }
+      rectRef.current = null;
+    }
+
+    // Recenter map
     if (position) {
       map.setView(position, 17);
     }
 
-    // Configure Geoman - Simplified for just Editing/Dragging
-    map.pm.addControls({
-      position: 'topleft',
-      drawCircle: false,
-      drawMarker: false,
-      drawCircleMarker: false,
-      drawPolyline: false,
-      drawPolygon: false,
-      drawText: false,
-      cutPolygon: false,
-      rotateMode: true,
-      dragMode: true,
-      editMode: true,
-      removalMode: false,
-      drawRectangle: false,
-    });
+    // Configure Geoman controls
+    try {
+      map.pm.addControls({
+        position: 'topleft',
+        drawCircle: false,
+        drawMarker: false,
+        drawCircleMarker: false,
+        drawPolyline: false,
+        drawPolygon: false,
+        drawText: false,
+        cutPolygon: false,
+        rotateMode: true,
+        dragMode: true,
+        editMode: true,
+        removalMode: false,
+        drawRectangle: false,
+      });
+    } catch (e) { console.warn('Geoman controls error:', e); }
 
-    map.pm.setGlobalOptions({ 
-      allowSelfIntersection: false,
-      hintlineStyle: { color: '#22c55e', dashArray: '5, 5', fillOpacity: 0 },
-      templineStyle: { color: '#22c55e', fillOpacity: 0 },
-    });
-
-    // AUTO-PLACE RECTANGLE ONCE - Make it much larger so it's visible
+    // AUTO-PLACE RECTANGLE - Make it BIG and VISIBLE
     const center = position || map.getCenter();
-    const lat = center.lat || center[0];
-    const lng = center.lng || center[1];
+    const lat = Array.isArray(center) ? center[0] : (center.lat ?? 28.6139);
+    const lng = Array.isArray(center) ? center[1] : (center.lng ?? 77.2090);
 
-    const delta = 0.01; // ~1km square instead of 222m
+    const delta = 0.005; // ~500m square - visible but not too huge
     const bounds = [
       [lat - delta, lng - delta],
       [lat + delta, lng + delta]
     ];
 
-    const rect = L.rectangle(bounds, {
-      color: '#ffff00',           // Bright yellow outline (highly visible on satellite)
-      weight: 5,                  // Thicker line
-      fillColor: '#00ff00',       // Bright green fill
-      fillOpacity: 0.15,          // Transparent fill to see satellite underneath
-      dashArray: '8, 4'           // Dashed pattern for clarity
-    }).addTo(map);
+    let rect;
+    try {
+      rect = L.rectangle(bounds, {
+        color: '#ffff00',           // Bright yellow outline
+        weight: 5,                  // Thick line
+        fillColor: '#00ff00',       // Bright green fill
+        fillOpacity: 0.2,
+        dashArray: '10, 5'          // Dashed pattern
+      });
+      rect.addTo(map);
+      rectRef.current = rect;
+      console.log('✅ Rectangle ADDED to map:', { bounds, lat, lng });
+    } catch (e) {
+      console.error('❌ Rectangle creation failed:', e);
+      return;
+    }
 
-    console.log('Rectangle created:', { bounds, lat, lng, delta });
-
-    // Enable editing AND dragging immediately
-    rect.pm.enable({
-      allowSelfIntersection: false,
-    });
+    // Enable Geoman edit mode (drag corners, rotate, drag whole shape)
+    try {
+      if (rect.pm) rect.pm.enable({ allowSelfIntersection: false });
+    } catch (e) { console.warn('pm.enable error:', e); }
 
     const handleUpdate = (e) => {
-      const layer = e.layer || e.target;
-      const geojson = layer.toGeoJSON();
-      onPolygonChange(geojson.geometry, calculateAreaHectares(layer));
+      try {
+        const layer = e.layer || e.target;
+        const geojson = layer.toGeoJSON();
+        onPolygonChange(geojson.geometry, calculateAreaHectares(layer));
+      } catch (err) { console.warn('handleUpdate error:', err); }
     };
 
-    // Initial state update
+    // Initial state update so the bottom button enables immediately
     handleUpdate({ target: rect });
 
     // Listen for every possible change to keep state synced
@@ -124,12 +138,16 @@ const MapManager = ({ position, onPolygonChange }) => {
     rect.on('pm:markerdragend', handleUpdate);
 
     return () => {
-      if (rect) {
-        rect.off('pm:edit', handleUpdate);
-        rect.off('pm:dragend', handleUpdate);
-        rect.off('pm:rotateend', handleUpdate);
-        rect.off('pm:markerdragend', handleUpdate);
-        map.removeLayer(rect);
+      const r = rectRef.current;
+      if (r) {
+        try {
+          r.off('pm:edit', handleUpdate);
+          r.off('pm:dragend', handleUpdate);
+          r.off('pm:rotateend', handleUpdate);
+          r.off('pm:markerdragend', handleUpdate);
+          map.removeLayer(r);
+        } catch (e) { console.warn('Cleanup remove error:', e); }
+        rectRef.current = null;
       }
     };
   }, [map, position, onPolygonChange]);
