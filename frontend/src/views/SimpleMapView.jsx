@@ -18,26 +18,31 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Helper to calculate area in hectares (rough approximation for rectangles)
+// Helper to calculate area in hectares using proper geodesic calculation
 const calculateAreaHectares = (layer) => {
   if (!layer || !layer.getLatLngs) return 0;
+
   const latlngs = layer.getLatLngs()[0];
-  if (!latlngs || !latlngs[0]) return 0;
+  if (!latlngs || latlngs.length < 3) return 0;
 
-  const lats = latlngs.map(l => l.lat);
-  const lngs = latlngs.map(l => l.lng);
-  
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  // Shoelace formula for geodesic area (works for any polygon)
+  let area = 0;
+  const R = 6371000; // Earth radius in meters
 
-  const latMid = (minLat + maxLat) / 2 * (Math.PI / 180);
-  const widthM = (maxLng - minLng) * 111320 * Math.cos(latMid);
-  const heightM = (maxLat - minLat) * 111320;
-  
-  const areaSqM = Math.abs(widthM * heightM);
-  return (areaSqM / 10000).toFixed(2);
+  for (let i = 0; i < latlngs.length; i++) {
+    const p1 = latlngs[i];
+    const p2 = latlngs[(i + 1) % latlngs.length];
+
+    const lat1 = (p1.lat * Math.PI) / 180;
+    const lat2 = (p2.lat * Math.PI) / 180;
+    const dLng = ((p2.lng - p1.lng) * Math.PI) / 180;
+
+    area += Math.sin(lat1) * Math.cos(lat2) * Math.sin(dLng);
+    area -= Math.sin(lat2) * Math.cos(lat1) * Math.sin(dLng);
+  }
+
+  area = Math.abs(area * R * R) / 2; // Result in square meters
+  return (area / 10000).toFixed(2); // Convert to hectares
 };
 
 // Component to handle map interactions and Geoman controls
@@ -89,11 +94,11 @@ const MapManager = ({ position, onPolygonChange }) => {
     ];
 
     const rect = L.rectangle(bounds, {
-      color: '#ffffff',
-      weight: 4,
-      fillColor: '#22c55e',
-      fillOpacity: 0.4, 
-      dashArray: '5, 5'
+      color: '#ffff00',           // Bright yellow outline (highly visible on satellite)
+      weight: 3,
+      fillColor: '#00ff00',       // Bright green fill
+      fillOpacity: 0.15,          // Transparent fill to see satellite underneath
+      dashArray: '8, 4'           // Dashed pattern for clarity
     }).addTo(map);
 
     // Enable editing AND dragging immediately
@@ -140,6 +145,8 @@ const SimpleMapView = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [area, setArea] = useState(0);
   const [polygon, setPolygon] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const editTimeoutRef = useRef(null);
 
   // Magic link token handling
   useEffect(() => {
@@ -172,6 +179,15 @@ const SimpleMapView = () => {
   const handlePolygonChange = React.useCallback((geo, val) => {
     setPolygon(geo);
     setArea(val);
+    setIsEditing(true);
+
+    // Clear existing timeout
+    if (editTimeoutRef.current) clearTimeout(editTimeoutRef.current);
+
+    // Set timeout to mark as done editing after 1 second of no changes
+    editTimeoutRef.current = setTimeout(() => {
+      setIsEditing(false);
+    }, 1000);
   }, []);
 
   const handleConfirm = async () => {
@@ -240,15 +256,18 @@ const SimpleMapView = () => {
         </div>
       </div>
 
-      {/* Area Indicator Overlay */}
+      {/* Area Indicator Overlay with Status */}
       {area > 0 && (
         <div className="absolute top-20 left-4 right-4 z-[1000] pointer-events-none flex justify-center">
-          <motion.div 
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="bg-white/95 backdrop-blur-sm text-gray-900 px-6 py-3 rounded-3xl shadow-2xl border border-white flex flex-col items-center"
+          <motion.div
+            initial={{ y: -20, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            className="bg-white/95 backdrop-blur-sm text-gray-900 px-6 py-3 rounded-3xl shadow-2xl border-2 flex flex-col items-center"
+            style={{ borderColor: isEditing ? '#fbbf24' : '#22c55e' }}
           >
-            <span className="text-[10px] font-black uppercase tracking-widest text-green-700 mb-0.5">Plot Area</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-0.5">
+              {isEditing ? '✏️ Editing...' : '✅ Ready'}
+            </span>
             <div className="flex items-baseline space-x-1">
               <span className="text-2xl font-black">{area}</span>
               <span className="text-sm font-bold text-gray-400">Hectares</span>
