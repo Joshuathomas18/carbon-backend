@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Loader2, CheckCircle2, MessageSquare } from 'lucide-react';
@@ -18,14 +18,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Helper to calculate area in hectares using proper geodesic calculation
-const calculateAreaHectares = (layer) => {
-  if (!layer || !layer.getLatLngs) return 0;
-
-  const latlngs = layer.getLatLngs()[0];
+// Calculate polygon area in hectares using geodesic Shoelace formula
+const calculateAreaHectares = (latlngs) => {
   if (!latlngs || latlngs.length < 3) return 0;
 
-  // Shoelace formula for geodesic area (works for any polygon)
   let area = 0;
   const R = 6371000; // Earth radius in meters
 
@@ -41,34 +37,24 @@ const calculateAreaHectares = (layer) => {
     area -= Math.sin(lat2) * Math.cos(lat1) * Math.sin(dLng);
   }
 
-  area = Math.abs(area * R * R) / 2; // Result in square meters
-  return area / 10000; // Hectares (full precision - caller formats for display)
+  area = Math.abs(area * R * R) / 2;
+  return area / 10000; // Convert m² to hectares
 };
 
-// Component to handle map interactions and Geoman controls
+// Map controller: activates polygon drawing
 const MapManager = ({ position, onPolygonChange }) => {
   const map = useMap();
-  const rectRef = useRef(null);
+  const drawLayerRef = useRef(null);
 
   useEffect(() => {
     if (!map) return;
 
-    console.log('🟢 MapManager mounting, position:', position);
-
-    // Always remove any existing rectangle first (handles StrictMode double-mount)
-    if (rectRef.current) {
-      try {
-        map.removeLayer(rectRef.current);
-      } catch (e) { console.warn('Cleanup error:', e); }
-      rectRef.current = null;
-    }
-
-    // Recenter map
+    // Center map on position (either from session token or default)
     if (position) {
-      map.setView(position, 17);
+      map.setView(position, 16);
     }
 
-    // Configure Geoman controls
+    // Initialize Geoman with polygon drawing only
     try {
       map.pm.addControls({
         position: 'topleft',
@@ -76,7 +62,7 @@ const MapManager = ({ position, onPolygonChange }) => {
         drawMarker: false,
         drawCircleMarker: false,
         drawPolyline: false,
-        drawPolygon: false,
+        drawPolygon: true,  // Only polygon drawing
         drawText: false,
         cutPolygon: false,
         rotateMode: true,
@@ -85,71 +71,63 @@ const MapManager = ({ position, onPolygonChange }) => {
         removalMode: false,
         drawRectangle: false,
       });
-    } catch (e) { console.warn('Geoman controls error:', e); }
 
-    // AUTO-PLACE RECTANGLE - Make it BIG and VISIBLE
-    const center = position || map.getCenter();
-    const lat = Array.isArray(center) ? center[0] : (center.lat ?? 28.6139);
-    const lng = Array.isArray(center) ? center[1] : (center.lng ?? 77.2090);
-
-    const delta = 0.005; // ~500m square - visible but not too huge
-    const bounds = [
-      [lat - delta, lng - delta],
-      [lat + delta, lng + delta]
-    ];
-
-    let rect;
-    try {
-      rect = L.rectangle(bounds, {
-        color: '#ffff00',           // Bright yellow outline
-        weight: 5,                  // Thick line
-        fillColor: '#00ff00',       // Bright green fill
-        fillOpacity: 0.2,
-        dashArray: '10, 5'          // Dashed pattern
+      map.pm.setGlobalOptions({
+        allowSelfIntersection: false,
       });
-      rect.addTo(map);
-      rectRef.current = rect;
-      console.log('✅ Rectangle ADDED to map:', { bounds, lat, lng });
-    } catch (e) {
-      console.error('❌ Rectangle creation failed:', e);
-      return;
+
+      // When user draws a polygon
+      const handleDrawCreate = (e) => {
+        const { layer } = e;
+        if (layer && layer.getLatLngs) {
+          const latlngs = layer.getLatLngs()[0] || [];
+          const area = calculateAreaHectares(latlngs);
+          const geojson = layer.toGeoJSON();
+
+          // Store reference to enable editing
+          drawLayerRef.current = layer;
+          onPolygonChange(geojson.geometry, area, latlngs);
+
+          console.log('✅ Polygon drawn:', {
+            corners: latlngs.length,
+            area: area.toFixed(2),
+            coordinates: latlngs.map(p => `[${p.lat.toFixed(4)},${p.lng.toFixed(4)}]`).join(' ')
+          });
+        }
+      };
+
+      // When user edits/drags/rotates
+      const handleDrawUpdate = (e) => {
+        const layer = e.layer || drawLayerRef.current;
+        if (layer && layer.getLatLngs) {
+          const latlngs = layer.getLatLngs()[0] || [];
+          const area = calculateAreaHectares(latlngs);
+          const geojson = layer.toGeoJSON();
+          onPolygonChange(geojson.geometry, area, latlngs);
+
+          console.log('📍 Polygon updated:', {
+            area: area.toFixed(2),
+            corners: latlngs.length
+          });
+        }
+      };
+
+      map.on('pm:create', handleDrawCreate);
+      map.on('pm:edit', handleDrawUpdate);
+      map.on('pm:drag', handleDrawUpdate);
+      map.on('pm:dragend', handleDrawUpdate);
+      map.on('pm:rotateend', handleDrawUpdate);
+
+      return () => {
+        map.off('pm:create', handleDrawCreate);
+        map.off('pm:edit', handleDrawUpdate);
+        map.off('pm:drag', handleDrawUpdate);
+        map.off('pm:dragend', handleDrawUpdate);
+        map.off('pm:rotateend', handleDrawUpdate);
+      };
+    } catch (err) {
+      console.error('Geoman setup error:', err);
     }
-
-    // Enable Geoman edit mode (drag corners, rotate, drag whole shape)
-    try {
-      if (rect.pm) rect.pm.enable({ allowSelfIntersection: false });
-    } catch (e) { console.warn('pm.enable error:', e); }
-
-    const handleUpdate = (e) => {
-      try {
-        const layer = e.layer || e.target;
-        const geojson = layer.toGeoJSON();
-        onPolygonChange(geojson.geometry, calculateAreaHectares(layer));
-      } catch (err) { console.warn('handleUpdate error:', err); }
-    };
-
-    // Initial state update so the bottom button enables immediately
-    handleUpdate({ target: rect });
-
-    // Listen for every possible change to keep state synced
-    rect.on('pm:edit', handleUpdate);
-    rect.on('pm:dragend', handleUpdate);
-    rect.on('pm:rotateend', handleUpdate);
-    rect.on('pm:markerdragend', handleUpdate);
-
-    return () => {
-      const r = rectRef.current;
-      if (r) {
-        try {
-          r.off('pm:edit', handleUpdate);
-          r.off('pm:dragend', handleUpdate);
-          r.off('pm:rotateend', handleUpdate);
-          r.off('pm:markerdragend', handleUpdate);
-          map.removeLayer(r);
-        } catch (e) { console.warn('Cleanup remove error:', e); }
-        rectRef.current = null;
-      }
-    };
   }, [map, position, onPolygonChange]);
 
   return null;
@@ -157,7 +135,7 @@ const MapManager = ({ position, onPolygonChange }) => {
 
 const SimpleMapView = () => {
   const navigate = useNavigate();
-  const [position, setPosition] = useState([28.6139, 77.2090]); // Default to Delhi
+  const [position, setPosition] = useState([28.6139, 77.2090]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [token, setToken] = useState(null);
@@ -165,10 +143,11 @@ const SimpleMapView = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [area, setArea] = useState(0);
   const [polygon, setPolygon] = useState(null);
+  const [coordinates, setCoordinates] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const editTimeoutRef = useRef(null);
 
-  // Magic link token handling
+  // Load session token and position from URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('token');
@@ -178,47 +157,46 @@ const SimpleMapView = () => {
       setToken(urlToken);
       setIsLoading(true);
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-      
+
       fetch(`${apiBaseUrl}/sessions/${urlToken}`)
         .then(res => res.json())
         .then(data => {
           if (data.lat && data.lon) {
             setPosition([data.lat, data.lon]);
+            console.log('📍 Loaded position from token:', data);
           }
           if (data.phone) {
             setPhoneNumber(data.phone);
           }
         })
-        .catch(err => console.error("Session lookup failed:", err))
+        .catch(err => console.error('Session lookup failed:', err))
         .finally(() => setIsLoading(false));
     } else if (urlPhone) {
       setPhoneNumber(urlPhone);
     }
   }, []);
 
-  const handlePolygonChange = React.useCallback((geo, val) => {
-    setPolygon(geo);
-    setArea(val);
+  const handlePolygonChange = (geojson, areaValue, latlngs) => {
+    setPolygon(geojson);
+    setArea(areaValue);
+    setCoordinates(latlngs);
     setIsEditing(true);
 
-    // Clear existing timeout
     if (editTimeoutRef.current) clearTimeout(editTimeoutRef.current);
-
-    // Set timeout to mark as done editing after 1 second of no changes
     editTimeoutRef.current = setTimeout(() => {
       setIsEditing(false);
     }, 1000);
-  }, []);
+  };
 
   const handleConfirm = async () => {
     if (!polygon) {
-      alert("Please draw your farm boundary first using the square icon.");
+      alert("Draw your farm boundary on the map by tapping the polygon icon (top-left).");
       return;
     }
 
     const areaNum = Number(area);
-    if (!Number.isFinite(areaNum) || areaNum <= 0) {
-      alert("Your selected area is too small to measure. Resize the box to cover your farm.");
+    if (!Number.isFinite(areaNum) || areaNum <= 0.01) {
+      alert("Your farm area is too small (less than 0.01 hectares). Draw a larger area.");
       return;
     }
 
@@ -277,48 +255,56 @@ const SimpleMapView = () => {
 
   return (
     <div className="relative h-[100dvh] w-full flex flex-col overflow-hidden bg-black text-white">
-      {/* Header Overlay */}
+      {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-[1000] p-4 pointer-events-none">
         <div className="flex items-center justify-between">
-          <button 
+          <button
             onClick={() => navigate('/')}
             className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 pointer-events-auto active:scale-90 transition-transform"
           >
             <ChevronLeft size={24} />
           </button>
-          
+
           <div className="bg-green-600/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-green-400/30 flex items-center space-x-2 pointer-events-auto">
-            <span className="text-xs font-black uppercase tracking-widest leading-none">Satellite Active</span>
+            <span className="text-xs font-black uppercase tracking-widest leading-none">Draw Your Farm</span>
             <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
           </div>
         </div>
       </div>
 
-      {/* Area Indicator Overlay with Status */}
+      {/* Area & Coordinates Display */}
       {area > 0 && (
-        <div className="absolute top-20 left-4 right-4 z-[1000] pointer-events-none flex justify-center">
+        <div className="absolute top-20 left-4 right-4 z-[1000] pointer-events-none">
           <motion.div
             initial={{ y: -20, opacity: 0, scale: 0.9 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
-            className="bg-white/95 backdrop-blur-sm text-gray-900 px-6 py-3 rounded-3xl shadow-2xl border-2 flex flex-col items-center"
+            className="bg-white/95 backdrop-blur-sm text-gray-900 px-6 py-4 rounded-3xl shadow-2xl border-2 flex flex-col items-center gap-2"
             style={{ borderColor: isEditing ? '#fbbf24' : '#22c55e' }}
           >
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-600 mb-0.5">
-              {isEditing ? '✏️ Editing...' : '✅ Ready'}
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-600">
+              {isEditing ? '✏️ Editing...' : '✅ Ready to Save'}
             </span>
             <div className="flex items-baseline space-x-1">
-              <span className="text-2xl font-black">{Number(area).toFixed(2)}</span>
+              <span className="text-3xl font-black">{area.toFixed(2)}</span>
               <span className="text-sm font-bold text-gray-400">Hectares</span>
             </div>
+            {coordinates.length > 0 && (
+              <div className="text-xs text-gray-500 text-center mt-1 max-w-xs">
+                <div className="font-bold text-gray-700 mb-0.5">Coordinates ({coordinates.length} corners):</div>
+                {coordinates.map((c, i) => (
+                  <div key={i}>{i + 1}. {c.lat.toFixed(5)}, {c.lng.toFixed(5)}</div>
+                ))}
+              </div>
+            )}
           </motion.div>
         </div>
       )}
 
-      {/* Map Container */}
+      {/* Map */}
       <div className="flex-1 w-full relative min-h-[300px]">
-        <MapContainer 
-          center={position} 
-          zoom={17} 
+        <MapContainer
+          center={position}
+          zoom={16}
           style={{ height: '100%', width: '100%', position: 'absolute' }}
           zoomControl={false}
           attributionControl={false}
@@ -334,17 +320,17 @@ const SimpleMapView = () => {
       {/* Bottom Action Tray */}
       <div className="bg-zinc-950 p-6 pb-12 rounded-t-[40px] border-t border-zinc-800 z-[1000] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
         <div className="w-12 h-1 bg-zinc-800 rounded-full mx-auto mb-6" />
-        <h2 className="text-xl font-black mb-1">Confirm Land Boundary</h2>
+        <h2 className="text-xl font-black mb-2">Draw Your Farm Boundary</h2>
         <p className="text-zinc-500 text-sm font-medium mb-8">
-          Draw and resize the green box to match your farm. We'll use this to calculate your carbon credits.
+          Tap the polygon icon (top-left) to start drawing. Drag corners to adjust. Area calculates automatically.
         </p>
 
         <button
-          disabled={isSaving || !polygon}
+          disabled={isSaving || !polygon || area < 0.01}
           onClick={handleConfirm}
           className={`w-full py-6 rounded-3xl font-black text-lg flex items-center justify-center space-x-3 transition-all active:scale-95 shadow-xl ${
-            polygon 
-              ? 'bg-green-600 border-b-4 border-green-800 text-white hover:bg-green-500' 
+            polygon && area >= 0.01
+              ? 'bg-green-600 border-b-4 border-green-800 text-white hover:bg-green-500'
               : 'bg-zinc-800 text-zinc-600 cursor-not-allowed border-b-4 border-zinc-900'
           }`}
         >
@@ -357,15 +343,15 @@ const SimpleMapView = () => {
         </button>
       </div>
 
-      {/* Success Popup */}
+      {/* Success Modal */}
       <AnimatePresence>
         {showSuccess && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-xl flex items-center justify-center p-8"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               className="bg-zinc-900 w-full max-w-sm rounded-[40px] p-8 border border-zinc-800 shadow-2xl text-center"
@@ -375,9 +361,9 @@ const SimpleMapView = () => {
               </div>
               <h3 className="text-2xl font-black text-white mb-4">Boundary Saved!</h3>
               <p className="text-zinc-400 font-medium mb-8 leading-relaxed">
-                Excellent. We are now processing your satellite data. Check WhatsApp for your carbon estimate.
+                Processing your satellite data. Check WhatsApp for your carbon estimate.
               </p>
-              
+
               <button
                 onClick={() => window.location.href = 'https://wa.me/your_number'}
                 className="w-full py-5 bg-green-600 hover:bg-green-500 text-white rounded-3xl font-black text-lg flex items-center justify-center space-x-3 transition-colors border-b-4 border-green-800 active:scale-95"
@@ -385,7 +371,7 @@ const SimpleMapView = () => {
                 <MessageSquare size={20} />
                 <span>Open WhatsApp</span>
               </button>
-              
+
               <button
                 onClick={() => setShowSuccess(false)}
                 className="mt-6 text-zinc-500 font-bold hover:text-white transition-colors"
