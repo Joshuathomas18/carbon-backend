@@ -42,7 +42,7 @@ const calculateAreaHectares = (layer) => {
   }
 
   area = Math.abs(area * R * R) / 2; // Result in square meters
-  return (area / 10000).toFixed(2); // Convert to hectares
+  return area / 10000; // Hectares (full precision - caller formats for display)
 };
 
 // Component to handle map interactions and Geoman controls
@@ -216,13 +216,19 @@ const SimpleMapView = () => {
       return;
     }
 
+    const areaNum = Number(area);
+    if (!Number.isFinite(areaNum) || areaNum <= 0) {
+      alert("Your selected area is too small to measure. Resize the box to cover your farm.");
+      return;
+    }
+
     setIsSaving(true);
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
-    
+
     try {
       const payload = {
         polygon: polygon,
-        area_hectares: parseFloat(area),
+        area_hectares: areaNum,
       };
 
       if (token) payload.token = token;
@@ -237,8 +243,20 @@ const SimpleMapView = () => {
       if (response.ok) {
         setShowSuccess(true);
       } else {
-        const errData = await response.json();
-        alert(`Error: ${errData.detail || 'Failed to save boundary'}`);
+        let errMsg = `Failed to save boundary (HTTP ${response.status})`;
+        try {
+          const errData = await response.json();
+          const d = errData.detail;
+          if (typeof d === 'string') {
+            errMsg = d;
+          } else if (Array.isArray(d)) {
+            errMsg = d.map(x => x.msg || JSON.stringify(x)).join('; ');
+          } else if (d) {
+            errMsg = JSON.stringify(d);
+          }
+        } catch (_) { /* keep default */ }
+        console.error("Save error response:", errMsg);
+        alert(`Error: ${errMsg}`);
       }
     } catch (err) {
       console.error("Save failed:", err);
@@ -289,7 +307,7 @@ const SimpleMapView = () => {
               {isEditing ? '✏️ Editing...' : '✅ Ready'}
             </span>
             <div className="flex items-baseline space-x-1">
-              <span className="text-2xl font-black">{area}</span>
+              <span className="text-2xl font-black">{Number(area).toFixed(2)}</span>
               <span className="text-sm font-bold text-gray-400">Hectares</span>
             </div>
           </motion.div>
