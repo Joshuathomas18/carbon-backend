@@ -18,27 +18,34 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Calculate polygon area in hectares using geodesic Shoelace formula
+// Calculate polygon area in hectares.
+// Projects lat/lng corners to local meters (equirectangular around the
+// polygon centroid), then applies the standard 2D Shoelace formula.
+// Accurate to well under 1% for farm-scale polygons.
 const calculateAreaHectares = (latlngs) => {
   if (!latlngs || latlngs.length < 3) return 0;
 
-  let area = 0;
-  const R = 6371000; // Earth radius in meters
+  const R = 6378137; // WGS84 equatorial radius (m)
+  const DEG2RAD = Math.PI / 180;
 
-  for (let i = 0; i < latlngs.length; i++) {
-    const p1 = latlngs[i];
-    const p2 = latlngs[(i + 1) % latlngs.length];
+  // Centroid of corners as projection reference
+  const refLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
+  const refLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
+  const cosRefLat = Math.cos(refLat * DEG2RAD);
 
-    const lat1 = (p1.lat * Math.PI) / 180;
-    const lat2 = (p2.lat * Math.PI) / 180;
-    const dLng = ((p2.lng - p1.lng) * Math.PI) / 180;
+  const xy = latlngs.map(p => ({
+    x: (p.lng - refLng) * DEG2RAD * R * cosRefLat,
+    y: (p.lat - refLat) * DEG2RAD * R,
+  }));
 
-    area += Math.sin(lat1) * Math.cos(lat2) * Math.sin(dLng);
-    area -= Math.sin(lat2) * Math.cos(lat1) * Math.sin(dLng);
+  let cross = 0;
+  for (let i = 0; i < xy.length; i++) {
+    const a = xy[i];
+    const b = xy[(i + 1) % xy.length];
+    cross += a.x * b.y - b.x * a.y;
   }
-
-  area = Math.abs(area * R * R) / 2;
-  return area / 10000; // Convert m² to hectares
+  const squareMeters = Math.abs(cross) / 2;
+  return squareMeters / 10000; // hectares
 };
 
 // Map controller: activates polygon drawing
@@ -90,8 +97,9 @@ const MapManager = ({ position, onPolygonChange }) => {
 
           console.log('✅ Polygon drawn:', {
             corners: latlngs.length,
-            area: area.toFixed(2),
-            coordinates: latlngs.map(p => `[${p.lat.toFixed(4)},${p.lng.toFixed(4)}]`).join(' ')
+            hectares: area.toFixed(4),
+            squareMeters: (area * 10000).toFixed(0),
+            coordinates: latlngs.map(p => `[${p.lat.toFixed(6)},${p.lng.toFixed(6)}]`)
           });
         }
       };
@@ -106,7 +114,8 @@ const MapManager = ({ position, onPolygonChange }) => {
           onPolygonChange(geojson.geometry, area, latlngs);
 
           console.log('📍 Polygon updated:', {
-            area: area.toFixed(2),
+            hectares: area.toFixed(4),
+            squareMeters: (area * 10000).toFixed(0),
             corners: latlngs.length
           });
         }
@@ -195,8 +204,8 @@ const SimpleMapView = () => {
     }
 
     const areaNum = Number(area);
-    if (!Number.isFinite(areaNum) || areaNum <= 0.01) {
-      alert("Your farm area is too small (less than 0.01 hectares). Draw a larger area.");
+    if (!Number.isFinite(areaNum) || areaNum <= 0) {
+      alert("Couldn't measure the polygon — please redraw it.");
       return;
     }
 
@@ -285,8 +294,8 @@ const SimpleMapView = () => {
               {isEditing ? '✏️ Editing...' : '✅ Ready to Save'}
             </span>
             <div className="flex items-baseline space-x-1">
-              <span className="text-3xl font-black">{area.toFixed(2)}</span>
-              <span className="text-sm font-bold text-gray-400">Hectares</span>
+              <span className="text-3xl font-black">{area >= 1 ? area.toFixed(2) : (area * 10000).toFixed(0)}</span>
+              <span className="text-sm font-bold text-gray-400">{area >= 1 ? 'Hectares' : 'm²'}</span>
             </div>
             {coordinates.length > 0 && (
               <div className="text-xs text-gray-500 text-center mt-1 max-w-xs">
@@ -326,10 +335,10 @@ const SimpleMapView = () => {
         </p>
 
         <button
-          disabled={isSaving || !polygon || area < 0.01}
+          disabled={isSaving || !polygon || area <= 0}
           onClick={handleConfirm}
           className={`w-full py-6 rounded-3xl font-black text-lg flex items-center justify-center space-x-3 transition-all active:scale-95 shadow-xl ${
-            polygon && area >= 0.01
+            polygon && area > 0
               ? 'bg-green-600 border-b-4 border-green-800 text-white hover:bg-green-500'
               : 'bg-zinc-800 text-zinc-600 cursor-not-allowed border-b-4 border-zinc-900'
           }`}
